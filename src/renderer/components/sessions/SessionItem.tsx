@@ -1,4 +1,4 @@
-import { GitBranch } from "lucide-react";
+import { GitBranch, Loader2 } from "lucide-react";
 
 import { cn, formatRelativeTime } from "~/lib/utils";
 import { useSessionsStore } from "~/stores/sessions";
@@ -25,20 +25,26 @@ export function SessionItem({
   isActive,
 }: SessionItemProps) {
   const setActiveSession = useSessionsStore((s) => s.setActiveSession);
-  const clearMessages = useLiveSessionStore((s) => s.clearMessages);
-  const pendingPermission = useLiveSessionStore((s) => s.pendingPermission);
+  const isRunning = useLiveSessionStore((s) => s.isRunning);
   const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
+  const permissionQueue = useLiveSessionStore((s) => s.permissionQueue);
+  const unseenSessionIds = useLiveSessionStore((s) => s.unseenSessionIds);
+  const clearSessionUnseen = useLiveSessionStore((s) => s.clearSessionUnseen);
+
+  const isSessionRunning = isRunning && liveSessionId === session.sessionId;
   const hasPendingApproval =
-    pendingPermission !== null &&
+    permissionQueue.length > 0 &&
     liveSessionId === session.sessionId &&
     !isActive;
+  const hasUnseenUpdate =
+    unseenSessionIds.includes(session.sessionId) && !isActive;
 
   const displayText = session.summary || session.firstPrompt || "Untitled session";
 
   return (
     <button
       onClick={() => {
-        clearMessages();
+        clearSessionUnseen(session.sessionId);
         setActiveSession(session.sessionId, projectPath);
       }}
       className={cn(
@@ -50,12 +56,16 @@ export function SessionItem({
     >
       <div className="flex items-center gap-2">
         <p className="line-clamp-2 flex-1 text-sm text-foreground">{displayText}</p>
-        {hasPendingApproval && (
+        {hasPendingApproval ? (
           <span className="relative flex h-2 w-2 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-amber opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-amber" />
           </span>
-        )}
+        ) : isSessionRunning ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent-blue" />
+        ) : hasUnseenUpdate ? (
+          <span className="h-2 w-2 shrink-0 rounded-full bg-accent-green" />
+        ) : null}
       </div>
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">

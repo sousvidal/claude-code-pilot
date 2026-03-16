@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, Plus, FolderOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { useLiveSessionStore } from "~/stores/liveSession";
 import { useSessionsStore } from "~/stores/sessions";
 import { useSessionsService } from "~/services/sessions.service";
 import { Input } from "~/components/ui/input";
@@ -52,13 +51,15 @@ export function SessionBrowser() {
   const { listSessions } = useSessionsService();
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
   const setActiveProjectPath = useSessionsStore((s) => s.setActiveProjectPath);
-  const clearMessages = useLiveSessionStore((s) => s.clearMessages);
+
+  const handleNewChatInFolder = (folderPath: string) => {
+    setActiveProjectPath(folderPath);
+  };
 
   const handleNewChat = async () => {
     const path = await window.api.dialog.openDirectory();
     if (path) {
       setActiveProjectPath(path);
-      clearMessages();
     }
   };
 
@@ -67,20 +68,22 @@ export function SessionBrowser() {
     queryFn: () => listSessions(),
   });
 
-  const projects = groupByProject((sessions as SessionInfo[]) ?? []);
+  const projects = useMemo(() => groupByProject(sessions ?? []), [sessions]);
 
-  const filteredProjects = searchQuery
-    ? projects
-        .map((project) => ({
-          ...project,
-          sessions: project.sessions.filter(
-            (s) =>
-              s.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              s.firstPrompt?.toLowerCase().includes(searchQuery.toLowerCase()),
-          ),
-        }))
-        .filter((p) => p.sessions.length > 0)
-    : projects;
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery) return projects;
+    const query = searchQuery.toLowerCase();
+    return projects
+      .map((project) => ({
+        ...project,
+        sessions: project.sessions.filter(
+          (s) =>
+            s.summary?.toLowerCase().includes(query) ||
+            s.firstPrompt?.toLowerCase().includes(query),
+        ),
+      }))
+      .filter((p) => p.sessions.length > 0);
+  }, [projects, searchQuery]);
 
   return (
     <div className="flex h-full flex-col bg-card border-r border-border">
@@ -138,6 +141,7 @@ export function SessionBrowser() {
                   displayName={project.displayName}
                   sessions={project.sessions}
                   activeSessionId={activeSessionId}
+                  onNewChat={handleNewChatInFolder}
                 />
               ))}
             </div>
