@@ -12,7 +12,10 @@ interface MessageStreamProps {
 }
 
 export function MessageStream({ messages, isLive }: MessageStreamProps) {
-  const turns = parseTurns(messages);
+  const parentMessages = messages.filter(
+    (m) => !(m as { parent_tool_use_id?: string | null }).parent_tool_use_id,
+  );
+  const turns = parseTurns(parentMessages);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -30,7 +33,7 @@ export function MessageStream({ messages, isLive }: MessageStreamProps) {
     const scrollArea = scrollAreaRef.current;
     if (!sentinel || !scrollArea) return;
 
-    const viewport = scrollArea.querySelector("[data-radix-scroll-area-viewport]") ?? scrollArea.firstElementChild;
+    const viewport = scrollArea.querySelector("[data-radix-scroll-area-viewport]");
     if (!viewport) return;
 
     const observer = new IntersectionObserver(
@@ -42,7 +45,7 @@ export function MessageStream({ messages, isLive }: MessageStreamProps) {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [turns.length]);
+  }, []);
 
   return (
     <div className="relative flex-1 overflow-hidden">

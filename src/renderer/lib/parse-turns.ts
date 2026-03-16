@@ -92,12 +92,26 @@ function parseToolResult(raw: unknown): ToolResult | undefined {
   };
 }
 
+function isTaskNotificationContent(content: unknown): boolean {
+  if (typeof content === "string") {
+    return content.trimStart().startsWith("<task-notification>");
+  }
+  if (Array.isArray(content) && content.length > 0) {
+    const first = content[0] as SdkContentBlock | undefined;
+    return first?.type === "text" && typeof first.text === "string"
+      ? first.text.trimStart().startsWith("<task-notification>")
+      : false;
+  }
+  return false;
+}
+
 function isToolResultUserMessage(msg: SdkMessage): boolean {
   if ("tool_use_result" in msg) return true;
   const content = msg.message?.content;
   if (Array.isArray(content) && content.length > 0) {
-    return content[0]?.type === "tool_result";
+    if (content[0]?.type === "tool_result") return true;
   }
+  if (isTaskNotificationContent(content)) return true;
   return false;
 }
 

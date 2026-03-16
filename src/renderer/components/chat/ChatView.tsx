@@ -40,9 +40,12 @@ export function ChatView() {
   const isRunning = useLiveSessionStore((s) => s.isRunning);
   const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
   const setLiveSessionId = useLiveSessionStore((s) => s.setLiveSessionId);
-  const pendingPermission = useLiveSessionStore((s) => s.pendingPermission);
-  const setPendingPermission = useLiveSessionStore((s) => s.setPendingPermission);
+  const permissionQueue = useLiveSessionStore((s) => s.permissionQueue);
+  const enqueuePermission = useLiveSessionStore((s) => s.enqueuePermission);
+  const dequeuePermission = useLiveSessionStore((s) => s.dequeuePermission);
+  const clearPermissionQueue = useLiveSessionStore((s) => s.clearPermissionQueue);
   const addAutoApprovedId = useLiveSessionStore((s) => s.addAutoApprovedId);
+  const pendingPermission = permissionQueue[0] ?? null;
   const { getMessages } = useSessionsService();
   const queryClient = useQueryClient();
 
@@ -58,30 +61,44 @@ export function ChatView() {
 
   useEffect(() => {
     const unsubMessage = window.api.claude.onMessage((msg) => {
-      const m = msg as Record<string, unknown>;
       if (
-        m.type === "system" &&
-        m.subtype === "init" &&
-        typeof m.session_id === "string"
+        typeof msg === "object" &&
+        msg !== null &&
+        (msg as Record<string, unknown>).type === "system" &&
+        (msg as Record<string, unknown>).subtype === "init" &&
+        typeof (msg as Record<string, unknown>).session_id === "string"
       ) {
-        setLiveSessionId(m.session_id);
+        const sessionId = (msg as Record<string, unknown>).session_id as string;
+        setLiveSessionId(sessionId);
+        const sessionsState = useSessionsStore.getState();
+        if (!sessionsState.activeSessionId) {
+          sessionsState.setActiveSession(sessionId, sessionsState.activeProjectPath ?? "");
+        }
+        void queryClient.invalidateQueries({ queryKey: ["sessions"] });
       }
       addMessage(msg);
     });
     const unsubDone = window.api.claude.onDone(() => {
       setRunning(false);
-      setPendingPermission(null);
+      clearPermissionQueue();
+      const { liveSessionId: doneSessionId } = useLiveSessionStore.getState();
+      const { activeSessionId: currentActiveId } = useSessionsStore.getState();
+      if (doneSessionId && doneSessionId !== currentActiveId) {
+        useLiveSessionStore.getState().markSessionUnseen(doneSessionId);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["sessions"] });
       void queryClient.invalidateQueries({ queryKey: ["sessionMessages"] });
+      void queryClient.invalidateQueries({ queryKey: ["subagentMessages"] });
     });
     return () => {
       unsubMessage();
       unsubDone();
     };
-  }, [addMessage, setRunning, setLiveSessionId, setPendingPermission, queryClient]);
+  }, [addMessage, setRunning, setLiveSessionId, clearPermissionQueue, queryClient]);
 
   useEffect(() => {
     const unsubRequest = window.api.permission.onRequest((request) => {
-      setPendingPermission(request);
+      enqueuePermission(request);
     });
     const unsubAutoApproved = window.api.permission.onAutoApproved((event) => {
       addAutoApprovedId(event.toolUseId);
@@ -90,7 +107,7 @@ export function ChatView() {
       unsubRequest();
       unsubAutoApproved();
     };
-  }, [setPendingPermission, addAutoApprovedId]);
+  }, [enqueuePermission, addAutoApprovedId]);
 
   const handleAllow = (alwaysAllow: boolean) => {
     if (!pendingPermission) return;
@@ -98,13 +115,13 @@ export function ChatView() {
       void window.api.permission.alwaysAllow(pendingPermission.toolName);
     }
     window.api.permission.respond(pendingPermission.id, "allow");
-    setPendingPermission(null);
+    dequeuePermission();
   };
 
   const handleDeny = () => {
     if (!pendingPermission) return;
     window.api.permission.respond(pendingPermission.id, "deny");
-    setPendingPermission(null);
+    dequeuePermission();
   };
 
   const hasProjectContext =
@@ -117,7 +134,7 @@ export function ChatView() {
         <div className="flex flex-1 items-center justify-center p-8">
           <div className="flex flex-col items-center gap-4 rounded-lg border-2 border-dashed border-border bg-card/50 px-12 py-8 text-center">
             <div className="text-4xl font-bold text-muted-foreground/30">
-              Claude Code Pilot
+              Clay
             </div>
             <p className="text-sm text-muted-foreground">
               Select a session or start a new chat
@@ -129,21 +146,34 @@ export function ChatView() {
     );
   }
 
-  const hasLiveMessages = liveMessages.length > 0;
-  const history = (historyMessages as unknown[]) ?? [];
+  const isViewingLiveSession =
+    liveSessionId !== null && liveSessionId === activeSessionId;
+  const relevantLiveMessages = isViewingLiveSession ? liveMessages : [];
+  const hasLiveMessages = relevantLiveMessages.length > 0;
+  const history = historyMessages ?? [];
 
-  // While the session is running or the post-completion refetch is in progress,
-  // merge history + live so new messages appear in real time.
-  // Once the refetch settles, history contains everything (with proper tool
-  // results from the JSONL) so we use it exclusively to avoid duplication.
   const messages = (() => {
     if (!hasLiveMessages) return history;
+    // While running or refetching history, append live messages after history.
+    // Deduplicate by excluding live messages whose uuid already appears in history.
     if (isRunning || isFetchingHistory) {
-      return activeSessionId ? [...history, ...liveMessages] : liveMessages;
+      const historyIds = new Set(
+        history
+          .filter((m): m is Record<string, unknown> => typeof m === "object" && m !== null)
+          .map((m) => m.uuid as string | undefined)
+          .filter(Boolean),
+      );
+      const newLiveMessages = relevantLiveMessages.filter((m) => {
+        if (typeof m !== "object" || m === null) return true;
+        const id = (m as Record<string, unknown>).uuid as string | undefined;
+        return !id || !historyIds.has(id);
+      });
+      return [...history, ...newLiveMessages];
     }
-    // Session done and refetch complete: prefer refreshed history, fall back to live
-    return history.length > 0 ? history : liveMessages;
+    return history.length > 0 ? history : relevantLiveMessages;
   })();
+
+  const isLive = isRunning && isViewingLiveSession;
 
   const showPermissionBlock =
     pendingPermission !== null &&
@@ -153,10 +183,10 @@ export function ChatView() {
     <div className="flex h-full flex-col">
       <ChatHeader />
       <div className="flex min-h-0 flex-1 flex-col">
-        {isLoadingHistory && !isRunning && !hasLiveMessages ? (
+        {isLoadingHistory && !isViewingLiveSession && !hasLiveMessages ? (
           <MessageLoadingSkeleton />
         ) : (
-          <MessageStream messages={messages} isLive={isRunning} />
+          <MessageStream messages={messages} isLive={isLive} />
         )}
       </div>
       {showPermissionBlock && (

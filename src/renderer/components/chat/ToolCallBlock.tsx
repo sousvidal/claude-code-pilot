@@ -114,7 +114,7 @@ export function ToolCallBlock({
   isLive = true,
 }: ToolCallBlockProps) {
   const autoApprovedIds = useLiveSessionStore((s) => s.autoApprovedIds);
-  const isAutoApproved = Boolean(toolUseId && autoApprovedIds.has(toolUseId));
+  const isAutoApproved = Boolean(toolUseId && autoApprovedIds.includes(toolUseId));
   const config = getToolConfig(toolName);
   const Icon = config.icon;
   const summary = getSummary(toolName, input);

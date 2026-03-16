@@ -15,6 +15,7 @@ import { useSessionsStore } from "~/stores/sessions";
 
 const EFFORT_LEVELS = ["low", "medium", "high"] as const;
 const MODELS = ["sonnet", "opus", "haiku"];
+const MAX_TEXTAREA_HEIGHT = 144; // 6 lines × 24px line-height
 
 export function ChatInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -25,11 +26,14 @@ export function ChatInput() {
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
   const isRunning = useLiveSessionStore((s) => s.isRunning);
-  const hasActiveSession = useLiveSessionStore((s) => s.hasActiveSession);
+  const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
   const setRunning = useLiveSessionStore((s) => s.setRunning);
-  const setHasActiveSession = useLiveSessionStore((s) => s.setHasActiveSession);
+  const resetLiveSession = useLiveSessionStore((s) => s.resetLiveSession);
   const setCurrentModel = useLiveSessionStore((s) => s.setCurrentModel);
   const addMessage = useLiveSessionStore((s) => s.addMessage);
+
+  const shouldContinueSession =
+    liveSessionId !== null && liveSessionId === activeSessionId;
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -43,9 +47,18 @@ export function ChatInput() {
       timestamp: new Date().toISOString(),
     };
 
-    if (!hasActiveSession) {
+    if (shouldContinueSession) {
+      resetLiveSession();
       setRunning(true);
-      setHasActiveSession(true);
+      addMessage(userMsg);
+      try {
+        await window.api.claude.send(text);
+      } finally {
+        setRunning(false);
+      }
+    } else {
+      resetLiveSession();
+      setRunning(true);
       setCurrentModel(selectedModel);
       addMessage(userMsg);
       try {
@@ -58,21 +71,17 @@ export function ChatInput() {
       } finally {
         setRunning(false);
       }
-    } else {
-      setRunning(true);
-      addMessage(userMsg);
-      await window.api.claude.send(text);
     }
   }, [
     input,
     isRunning,
-    hasActiveSession,
+    shouldContinueSession,
     selectedModel,
     effort,
     activeProjectPath,
     activeSessionId,
     setRunning,
-    setHasActiveSession,
+    resetLiveSession,
     setCurrentModel,
     addMessage,
   ]);
@@ -80,8 +89,8 @@ export function ChatInput() {
   const handleCancel = useCallback(() => {
     window.api.claude.cancel();
     setRunning(false);
-    setHasActiveSession(false);
-  }, [setRunning, setHasActiveSession]);
+    resetLiveSession();
+  }, [setRunning, resetLiveSession]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -97,7 +106,7 @@ export function ChatInput() {
     setInput(e.target.value);
     const el = e.target;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 6 * 24)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
   }, []);
 
   return (
@@ -116,7 +125,6 @@ export function ChatInput() {
             "w-full resize-none rounded-xl bg-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-70",
             "min-h-[40px] max-h-[144px]",
           )}
-          style={{ minHeight: "40px", maxHeight: "144px" }}
         />
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
