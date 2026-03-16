@@ -1,4 +1,4 @@
-import type { FileTreeNode } from "./types";
+import type { AutoApprovedEvent, FileTreeNode, PermissionRequest } from "./types";
 
 interface Window {
   api: {
@@ -23,6 +23,12 @@ interface Window {
     };
     dialog: {
       openDirectory: () => Promise<string | null>;
+    };
+    permission: {
+      onRequest: (callback: (request: PermissionRequest) => void) => () => void;
+      onAutoApproved: (callback: (event: AutoApprovedEvent) => void) => () => void;
+      respond: (id: string, decision: "allow" | "deny") => void;
+      alwaysAllow: (toolName: string) => Promise<void>;
     };
   };
 }

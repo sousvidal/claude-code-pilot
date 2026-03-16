@@ -34,6 +34,7 @@ export function AssistantMessage({ blocks, isLive }: AssistantMessageProps) {
           return (
             <ToolCallBlock
               key={i}
+              toolUseId={block.id}
               toolName={block.name}
               input={block.input}
               result={block.result}

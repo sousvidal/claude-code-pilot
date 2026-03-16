@@ -26,6 +26,12 @@ export function SessionItem({
 }: SessionItemProps) {
   const setActiveSession = useSessionsStore((s) => s.setActiveSession);
   const clearMessages = useLiveSessionStore((s) => s.clearMessages);
+  const pendingPermission = useLiveSessionStore((s) => s.pendingPermission);
+  const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
+  const hasPendingApproval =
+    pendingPermission !== null &&
+    liveSessionId === session.sessionId &&
+    !isActive;
 
   const displayText = session.summary || session.firstPrompt || "Untitled session";
 
@@ -42,7 +48,15 @@ export function SessionItem({
           : "hover:bg-muted/50",
       )}
     >
-      <p className="line-clamp-2 text-sm text-foreground">{displayText}</p>
+      <div className="flex items-center gap-2">
+        <p className="line-clamp-2 flex-1 text-sm text-foreground">{displayText}</p>
+        {hasPendingApproval && (
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-amber opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-amber" />
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">
           {formatRelativeTime(session.lastModified)}

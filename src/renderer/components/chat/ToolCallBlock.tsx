@@ -22,12 +22,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { cn } from "~/lib/utils";
+import { cn, truncate } from "~/lib/utils";
+import { useLiveSessionStore } from "~/stores/liveSession";
 import type { ToolResult } from "../../../shared/types";
-import { truncate } from "~/lib/utils";
 import { ToolResultContent } from "./ToolResultContent";
 
 interface ToolCallBlockProps {
+  toolUseId?: string;
   toolName: string;
   input: Record<string, unknown>;
   result?: ToolResult;
@@ -104,6 +105,7 @@ function getSummary(toolName: string, input: Record<string, unknown>): string {
 }
 
 export function ToolCallBlock({
+  toolUseId,
   toolName,
   input,
   result,
@@ -111,6 +113,8 @@ export function ToolCallBlock({
   isRunning,
   isLive = true,
 }: ToolCallBlockProps) {
+  const autoApprovedIds = useLiveSessionStore((s) => s.autoApprovedIds);
+  const isAutoApproved = Boolean(toolUseId && autoApprovedIds.has(toolUseId));
   const config = getToolConfig(toolName);
   const Icon = config.icon;
   const summary = getSummary(toolName, input);
@@ -138,6 +142,11 @@ export function ToolCallBlock({
           <Icon className="h-3.5 w-3.5" />
           {toolName}
         </span>
+        {isAutoApproved && (
+          <span className="inline-flex items-center rounded-md bg-accent-green/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-green">
+            auto
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
           {summary}
         </span>

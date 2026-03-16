@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
+import type { AutoApprovedEvent, PermissionRequest } from "../shared/types";
 
 contextBridge.exposeInMainWorld("api", {
   sessions: {
@@ -41,5 +42,27 @@ contextBridge.exposeInMainWorld("api", {
   },
   dialog: {
     openDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
+  },
+  permission: {
+    onRequest: (callback: (request: PermissionRequest) => void) => {
+      const handler = (_event: IpcRendererEvent, request: PermissionRequest) =>
+        callback(request);
+      ipcRenderer.on("permission:request", handler);
+      return () => ipcRenderer.removeListener("permission:request", handler);
+    },
+    onAutoApproved: (callback: (event: AutoApprovedEvent) => void) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        autoEvent: AutoApprovedEvent,
+      ) => callback(autoEvent);
+      ipcRenderer.on("permission:autoApproved", handler);
+      return () =>
+        ipcRenderer.removeListener("permission:autoApproved", handler);
+    },
+    respond: (id: string, decision: "allow" | "deny") => {
+      ipcRenderer.send("permission:respond", id, decision);
+    },
+    alwaysAllow: (toolName: string) =>
+      ipcRenderer.invoke("permission:alwaysAllow", toolName),
   },
 });

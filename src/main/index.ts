@@ -3,6 +3,7 @@ import { join } from "path";
 import { execSync } from "child_process";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { registerAllHandlers } from "./ipc";
+import { startApprovalServer, clearAlwaysAllowedTools } from "./services/approval.service";
 
 // GUI apps on macOS don't inherit the user's shell PATH or environment.
 // Spawn a login shell to pull in the real PATH so `claude` is found,
@@ -50,13 +51,18 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId("com.claude-code-pilot");
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
   });
 
+  if (is.dev) {
+    clearAlwaysAllowedTools();
+  }
+
+  await startApprovalServer();
   registerAllHandlers();
   createWindow();
 

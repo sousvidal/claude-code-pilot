@@ -66,3 +66,18 @@ export type ToolName =
   | "Task"
   | "TaskCreate"
   | "TaskUpdate";
+
+export interface PermissionRequest {
+  id: string;
+  sessionId: string;
+  toolName: string;
+  toolUseId: string;
+  toolInput: Record<string, unknown>;
+}
+
+export interface AutoApprovedEvent {
+  toolName: string;
+  toolUseId: string;
+  sessionId: string;
+  toolInput: Record<string, unknown>;
+}

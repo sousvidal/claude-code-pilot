@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import type { ChildProcess } from "child_process";
 import { createInterface } from "readline";
 import { getMainWindow } from "../index";
+import { getApprovalServerPort } from "./approval.service";
 import { logger } from "../lib/logger";
 
 const log = logger.child({ service: "claude" });
@@ -22,6 +23,23 @@ async function runOneTurn(
   const mainWindow = getMainWindow();
   if (!mainWindow) return;
 
+  const hookSettings = JSON.stringify({
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: ".*",
+          hooks: [
+            {
+              type: "http",
+              url: `http://127.0.0.1:${getApprovalServerPort()}/approve`,
+              timeout: 3600,
+            },
+          ],
+        },
+      ],
+    },
+  });
+
   const args: string[] = [
     "-p",
     "--input-format",
@@ -33,6 +51,8 @@ async function runOneTurn(
     model,
     "--effort",
     effort,
+    "--settings",
+    hookSettings,
   ];
   if (resume) args.push("--resume", resume);
 
