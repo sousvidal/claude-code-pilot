@@ -39,6 +39,47 @@ export function StreamingText({ text }: StreamingTextProps) {
               {children}
             </a>
           ),
+          table: ({ children, ...props }) => (
+            <div className="overflow-x-auto my-3">
+              <table className="border-collapse w-full text-sm" {...props}>
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children, ...props }) => (
+            <thead className="bg-muted" {...props}>
+              {children}
+            </thead>
+          ),
+          tr: ({ children, ...props }) => (
+            <tr className="even:bg-muted/40" {...props}>
+              {children}
+            </tr>
+          ),
+          th: ({ children, ...props }) => (
+            <th
+              className="border border-border px-3 py-2 text-left font-semibold"
+              {...props}
+            >
+              {children}
+            </th>
+          ),
+          td: ({ children, ...props }) => (
+            <td className="border border-border px-3 py-2" {...props}>
+              {children}
+            </td>
+          ),
+          blockquote: ({ children, ...props }) => (
+            <blockquote
+              className="border-l-4 border-border pl-4 my-2 text-muted-foreground italic"
+              {...props}
+            >
+              {children}
+            </blockquote>
+          ),
+          hr: ({ ...props }) => (
+            <hr className="border-border my-4" {...props} />
+          ),
         }}
       >
         {text}
