@@ -326,6 +326,15 @@ npm run lint        # Must pass with zero warnings
 - **New IPC channel added**: add the handler in `src/main/ipc/`, register it in `main/index.ts`, expose it in `src/preload/index.ts`, and declare its type in `src/shared/api.d.ts`.
 - **New translation keys added**: verify they exist in ALL locale files.
 
+## Agent Worktree Policy
+
+**ALWAYS** use `isolation: "worktree"` when spawning subagents via the Agent tool. No exceptions.
+
+- Every Agent tool call must include `"isolation": "worktree"` in its parameters.
+- This ensures all agent work happens on an isolated branch and never touches the current working tree directly.
+- If an agent makes changes, its branch and worktree path will be returned — review and merge intentionally.
+- If an agent makes no changes, the worktree is cleaned up automatically.
+
 ## Git Workflow (when asked to commit)
 
 - Review the diff before writing a commit message.
