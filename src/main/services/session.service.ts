@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 import { listSessions, getSessionMessages } from "@anthropic-ai/claude-agent-sdk";
@@ -40,43 +40,101 @@ export const sessionService = {
       log.warn({ sessionId, toolUseId }, "getSubagentMessages requires dir");
       return [];
     }
-    const projectSlug = dir.replace(/\//g, "-");
-    const jsonlPath = join(homedir(), ".claude", "projects", projectSlug, `${sessionId}.jsonl`);
+    const projectSlug = dir.replace(/[/_]/g, "-");
+    const baseDir = join(homedir(), ".claude", "projects", projectSlug);
+    const jsonlPath = join(baseDir, `${sessionId}.jsonl`);
+    const subagentsDir = join(baseDir, sessionId, "subagents");
 
     log.info({ sessionId, toolUseId, jsonlPath }, "loading subagent messages");
 
-    let content: string;
+    // Step 1: Find the promptId for this toolUseId in the parent JSONL.
+    // The tool result user message in the parent shares a promptId with the
+    // first message of the corresponding subagent JSONL file.
+    let promptId: string | undefined;
+    let parentContent: string;
     try {
-      content = await readFile(jsonlPath, "utf8");
+      parentContent = await readFile(jsonlPath, "utf8");
     } catch (err) {
       log.warn({ jsonlPath, err }, "could not read session JSONL for subagent messages");
       return [];
     }
 
-    const messages: unknown[] = [];
-    for (const line of content.split("\n")) {
+    for (const line of parentContent.split("\n")) {
       if (!line.trim()) continue;
       try {
         const obj = JSON.parse(line) as {
           type?: string;
-          parentToolUseID?: string;
-          data?: { type?: string; agentId?: string; message?: unknown };
+          promptId?: string;
+          message?: { content?: { type?: string; tool_use_id?: string }[] };
         };
         if (
-          obj.type === "progress" &&
-          obj.parentToolUseID === toolUseId &&
-          obj.data?.type === "agent_progress" &&
-          obj.data.message != null
+          obj.type === "user" &&
+          typeof obj.promptId === "string" &&
+          Array.isArray(obj.message?.content) &&
+          obj.message.content.some(
+            (c) => c.type === "tool_result" && c.tool_use_id === toolUseId,
+          )
         ) {
-          messages.push(obj.data.message);
+          promptId = obj.promptId;
+          break;
         }
       } catch {
         // skip malformed lines
       }
     }
 
-    log.info({ sessionId, toolUseId, messageCount: messages.length }, "subagent messages loaded");
-    return messages;
+    if (!promptId) {
+      log.warn({ sessionId, toolUseId }, "could not find promptId for toolUseId in parent JSONL");
+      return [];
+    }
+
+    // Step 2: Find the subagent JSONL file whose first message has the matching promptId.
+    let subagentFiles: string[];
+    try {
+      const entries = await readdir(subagentsDir);
+      subagentFiles = entries.filter((f) => f.endsWith(".jsonl"));
+    } catch {
+      log.warn({ subagentsDir }, "could not read subagents directory");
+      return [];
+    }
+
+    for (const file of subagentFiles) {
+      const filePath = join(subagentsDir, file);
+      let fileContent: string;
+      try {
+        fileContent = await readFile(filePath, "utf8");
+      } catch {
+        continue;
+      }
+
+      const firstLine = fileContent.split("\n").find((l) => l.trim());
+      if (!firstLine) continue;
+      try {
+        const first = JSON.parse(firstLine) as { promptId?: string };
+        if (first.promptId !== promptId) continue;
+      } catch {
+        continue;
+      }
+
+      // Found the matching subagent file — return all its user/assistant messages.
+      const messages: unknown[] = [];
+      for (const line of fileContent.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line) as { type?: string };
+          if (msg.type === "user" || msg.type === "assistant") {
+            messages.push(msg);
+          }
+        } catch {
+          // skip malformed lines
+        }
+      }
+      log.info({ sessionId, toolUseId, file, messageCount: messages.length }, "subagent messages loaded");
+      return messages;
+    }
+
+    log.warn({ sessionId, toolUseId, promptId }, "no matching subagent file found");
+    return [];
   },
 
   groupByProject(sessions: SDKSessionInfo[]): ProjectGroup[] {
