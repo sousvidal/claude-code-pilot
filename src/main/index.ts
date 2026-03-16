@@ -3,7 +3,7 @@ import { join } from "path";
 import { execSync } from "child_process";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { registerAllHandlers } from "./ipc";
-import { startApprovalServer, clearAlwaysAllowedTools } from "./services/approval.service";
+import { startApprovalServer } from "./services/approval.service";
 
 // GUI apps on macOS don't inherit the user's shell PATH or environment.
 // Spawn a login shell to pull in the real PATH so `claude` is found,
@@ -58,9 +58,9 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  if (is.dev) {
-    clearAlwaysAllowedTools();
-  }
+  // if (is.dev) {
+    // clearAlwaysAllowedTools();
+  // }
 
   await startApprovalServer();
   registerAllHandlers();

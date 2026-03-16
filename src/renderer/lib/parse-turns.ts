@@ -107,40 +107,61 @@ function isTaskNotificationContent(content: unknown): boolean {
 
 function isToolResultUserMessage(msg: SdkMessage): boolean {
   if ("tool_use_result" in msg) return true;
-  const content = msg.message?.content;
+  const content =
+    msg.message?.content ??
+    (msg as unknown as Record<string, unknown>).content;
   if (Array.isArray(content) && content.length > 0) {
-    if (content[0]?.type === "tool_result") return true;
+    if ((content[0] as SdkContentBlock | undefined)?.type === "tool_result") return true;
   }
   if (isTaskNotificationContent(content)) return true;
+  return false;
+}
+
+function extractToolResultBlocks(
+  msg: Record<string, unknown>,
+): SdkContentBlock[] | undefined {
+  // message.content (standard JSONL / stream-json format)
+  const msgObj = msg.message as { content?: unknown } | undefined;
+  if (Array.isArray(msgObj?.content)) return msgObj.content as SdkContentBlock[];
+  // Top-level content (alternative CLI format: { role:"user", content:[...] })
+  if (Array.isArray(msg.content)) return msg.content as SdkContentBlock[];
+  return undefined;
+}
+
+function isUserMessage(msg: Record<string, unknown>): boolean {
+  if (msg.type === "user") return true;
+  if (msg.role === "user" && !msg.type) return true;
   return false;
 }
 
 function collectToolResults(messages: unknown[]): Map<string, ToolResult> {
   const toolResults = new Map<string, ToolResult>();
   for (const raw of messages) {
-    const msg = raw as SdkMessage;
-    if (msg?.type === "user") {
+    const msg = raw as Record<string, unknown>;
+    if (!msg || typeof msg !== "object") continue;
+
+    if (isUserMessage(msg)) {
       if ("tool_use_result" in msg) {
         // Live streaming format: top-level tool_use_result + tool_use_id
-        const userWithResult = msg as SdkMessage & { tool_use_result?: unknown; tool_use_id?: string };
-        const result = parseToolResult(userWithResult.tool_use_result);
-        if (result && userWithResult.tool_use_id) {
-          toolResults.set(userWithResult.tool_use_id, result);
+        const result = parseToolResult(msg.tool_use_result);
+        if (result && typeof msg.tool_use_id === "string") {
+          toolResults.set(msg.tool_use_id, result);
         }
-      } else if (Array.isArray(msg.message?.content)) {
-        // Stored JSONL format: tool_result blocks inside message.content
-        for (const block of msg.message!.content as SdkContentBlock[]) {
-          if (block?.type === "tool_result" && typeof block.tool_use_id === "string") {
-            const result = parseToolResult(block);
-            if (result) toolResults.set(block.tool_use_id, result);
+      } else {
+        const contentBlocks = extractToolResultBlocks(msg);
+        if (contentBlocks) {
+          for (const block of contentBlocks) {
+            if (block?.type === "tool_result" && typeof block.tool_use_id === "string") {
+              const result = parseToolResult(block);
+              if (result) toolResults.set(block.tool_use_id, result);
+            }
           }
         }
       }
-    } else if (msg?.type === "result" && msg.subtype === "success") {
-      const resultMsg = msg as {
-        tool_results?: Array<{ tool_use_id?: string; content?: unknown; is_error?: boolean }>;
-      };
-      const results = resultMsg.tool_results;
+    } else if (msg.type === "result" && msg.subtype === "success") {
+      const results = msg.tool_results as
+        | Array<{ tool_use_id?: string; content?: unknown; is_error?: boolean }>
+        | undefined;
       if (Array.isArray(results)) {
         for (const r of results) {
           if (r?.tool_use_id) {

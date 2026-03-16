@@ -13,8 +13,8 @@ contextBridge.exposeInMainWorld("api", {
   claude: {
     start: (prompt: string, options: Record<string, unknown>) =>
       ipcRenderer.invoke("claude:start", prompt, options),
-    send: (message: string) => ipcRenderer.invoke("claude:send", message),
-    cancel: () => ipcRenderer.invoke("claude:cancel"),
+    cancel: (sessionId?: string) =>
+      ipcRenderer.invoke("claude:cancel", sessionId ? { sessionId } : undefined),
     setModel: (model: string) => ipcRenderer.invoke("claude:setModel", model),
     models: () => ipcRenderer.invoke("claude:models"),
     onMessage: (callback: (message: unknown) => void) => {
@@ -29,8 +29,9 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.on("claude:error", handler);
       return () => ipcRenderer.removeListener("claude:error", handler);
     },
-    onDone: (callback: () => void) => {
-      const handler = () => callback();
+    onDone: (callback: (event: { correlationId: string; sessionId: string | null }) => void) => {
+      const handler = (_event: IpcRendererEvent, doneEvent: { correlationId: string; sessionId: string | null }) =>
+        callback(doneEvent);
       ipcRenderer.on("claude:done", handler);
       return () => ipcRenderer.removeListener("claude:done", handler);
     },

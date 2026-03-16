@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { FileTreeNode as FileTreeNodeType } from "../../../shared/types";
 
+import { useEditorStore } from "~/stores/editor";
 import { cn } from "~/lib/utils";
 import { useFilesService } from "~/services/files.service";
 import { FileTree } from "./FileTree";
@@ -54,6 +55,8 @@ interface FileTreeNodeProps {
 export function FileTreeNode({ node, depth }: FileTreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { readDir } = useFilesService();
+  const openFile = useEditorStore((s) => s.openFile);
+  const activeFilePath = useEditorStore((s) => s.activeFilePath);
 
   const { data: children, isLoading } = useQuery({
     queryKey: ["files", "dir", node.path],
@@ -116,16 +119,21 @@ export function FileTreeNode({ node, depth }: FileTreeNodeProps) {
     );
   }
 
+  const isActive = activeFilePath === node.path;
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => openFile(node.path)}
       className={cn(
-        "flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
+        "flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
         "hover:bg-muted/50 cursor-pointer",
+        isActive && "bg-muted/70",
         indentClass,
       )}
     >
       {getFileIcon(node.extension)}
       <span className="truncate text-foreground">{node.name}</span>
-    </div>
+    </button>
   );
 }

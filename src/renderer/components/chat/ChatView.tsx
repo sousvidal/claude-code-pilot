@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLiveSessionStore } from "~/stores/liveSession";
 import { useSessionsStore } from "~/stores/sessions";
 import { useSessionsService } from "~/services/sessions.service";
+import { ErrorBoundary } from "~/components/ui/error-boundary";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./ChatInput";
@@ -34,18 +35,30 @@ function MessageLoadingSkeleton() {
 export function ChatView() {
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
-  const liveMessages = useLiveSessionStore((s) => s.messages);
-  const addMessage = useLiveSessionStore((s) => s.addMessage);
-  const setRunning = useLiveSessionStore((s) => s.setRunning);
-  const isRunning = useLiveSessionStore((s) => s.isRunning);
-  const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
-  const setLiveSessionId = useLiveSessionStore((s) => s.setLiveSessionId);
-  const permissionQueue = useLiveSessionStore((s) => s.permissionQueue);
+  const clearPendingNewSession = useSessionsStore((s) => s.clearPendingNewSession);
+
+  const setRunSessionId = useLiveSessionStore((s) => s.setRunSessionId);
+  const endRun = useLiveSessionStore((s) => s.endRun);
+  const addMessageToRun = useLiveSessionStore((s) => s.addMessageToRun);
   const enqueuePermission = useLiveSessionStore((s) => s.enqueuePermission);
   const dequeuePermission = useLiveSessionStore((s) => s.dequeuePermission);
-  const clearPermissionQueue = useLiveSessionStore((s) => s.clearPermissionQueue);
+  const clearPermissionsForSession = useLiveSessionStore((s) => s.clearPermissionsForSession);
   const addAutoApprovedId = useLiveSessionStore((s) => s.addAutoApprovedId);
-  const pendingPermission = permissionQueue[0] ?? null;
+  const markSessionUnseen = useLiveSessionStore((s) => s.markSessionUnseen);
+
+  // Derive state for the currently active session's run
+  const activeRun = useLiveSessionStore((s) => {
+    if (activeSessionId) {
+      return [...s.runningSessions.values()].find((r) => r.sessionId === activeSessionId) ?? null;
+    }
+    // New chat: find the pending run (no sessionId yet)
+    return [...s.runningSessions.values()].find((r) => r.sessionId === null) ?? null;
+  });
+
+  const isRunning = activeRun !== null;
+  const liveMessages = activeRun?.messages ?? [];
+  const pendingPermission = activeRun?.permissionQueue[0] ?? null;
+
   const { getMessages } = useSessionsService();
   const queryClient = useQueryClient();
 
@@ -61,44 +74,59 @@ export function ChatView() {
 
   useEffect(() => {
     const unsubMessage = window.api.claude.onMessage((msg) => {
+      const message = msg as Record<string, unknown>;
+      const correlationId = message.correlationId as string;
+      if (!correlationId) return;
+
       if (
-        typeof msg === "object" &&
-        msg !== null &&
-        (msg as Record<string, unknown>).type === "system" &&
-        (msg as Record<string, unknown>).subtype === "init" &&
-        typeof (msg as Record<string, unknown>).session_id === "string"
+        message.type === "system" &&
+        message.subtype === "init" &&
+        typeof message.session_id === "string"
       ) {
-        const sessionId = (msg as Record<string, unknown>).session_id as string;
-        setLiveSessionId(sessionId);
+        const sessionId = message.session_id;
+        setRunSessionId(correlationId, sessionId);
+        clearPendingNewSession();
         const sessionsState = useSessionsStore.getState();
         if (!sessionsState.activeSessionId) {
           sessionsState.setActiveSession(sessionId, sessionsState.activeProjectPath ?? "");
         }
         void queryClient.invalidateQueries({ queryKey: ["sessions"] });
       }
-      addMessage(msg);
+
+      addMessageToRun(correlationId, msg);
     });
-    const unsubDone = window.api.claude.onDone(() => {
-      setRunning(false);
-      clearPermissionQueue();
-      const { liveSessionId: doneSessionId } = useLiveSessionStore.getState();
-      const { activeSessionId: currentActiveId } = useSessionsStore.getState();
-      if (doneSessionId && doneSessionId !== currentActiveId) {
-        useLiveSessionStore.getState().markSessionUnseen(doneSessionId);
+
+    const unsubDone = window.api.claude.onDone(({ correlationId, sessionId }) => {
+      endRun(correlationId);
+      if (sessionId) {
+        clearPermissionsForSession(sessionId);
+        const { activeSessionId: currentActiveId } = useSessionsStore.getState();
+        if (sessionId !== currentActiveId) {
+          markSessionUnseen(sessionId);
+        }
       }
       void queryClient.invalidateQueries({ queryKey: ["sessions"] });
       void queryClient.invalidateQueries({ queryKey: ["sessionMessages"] });
       void queryClient.invalidateQueries({ queryKey: ["subagentMessages"] });
     });
+
     return () => {
       unsubMessage();
       unsubDone();
     };
-  }, [addMessage, setRunning, setLiveSessionId, clearPermissionQueue, queryClient]);
+  }, [
+    addMessageToRun,
+    setRunSessionId,
+    endRun,
+    clearPendingNewSession,
+    clearPermissionsForSession,
+    markSessionUnseen,
+    queryClient,
+  ]);
 
   useEffect(() => {
     const unsubRequest = window.api.permission.onRequest((request) => {
-      enqueuePermission(request);
+      enqueuePermission(request.sessionId, request);
     });
     const unsubAutoApproved = window.api.permission.onAutoApproved((event) => {
       addAutoApprovedId(event.toolUseId);
@@ -115,13 +143,17 @@ export function ChatView() {
       void window.api.permission.alwaysAllow(pendingPermission.toolName);
     }
     window.api.permission.respond(pendingPermission.id, "allow");
-    dequeuePermission();
+    if (activeRun?.sessionId) {
+      dequeuePermission(activeRun.sessionId);
+    }
   };
 
   const handleDeny = () => {
     if (!pendingPermission) return;
     window.api.permission.respond(pendingPermission.id, "deny");
-    dequeuePermission();
+    if (activeRun?.sessionId) {
+      dequeuePermission(activeRun.sessionId);
+    }
   };
 
   const hasProjectContext =
@@ -146,16 +178,11 @@ export function ChatView() {
     );
   }
 
-  const isViewingLiveSession =
-    liveSessionId !== null && liveSessionId === activeSessionId;
-  const relevantLiveMessages = isViewingLiveSession ? liveMessages : [];
-  const hasLiveMessages = relevantLiveMessages.length > 0;
   const history = historyMessages ?? [];
+  const hasLiveMessages = liveMessages.length > 0;
 
   const messages = (() => {
     if (!hasLiveMessages) return history;
-    // While running or refetching history, append live messages after history.
-    // Deduplicate by excluding live messages whose uuid already appears in history.
     if (isRunning || isFetchingHistory) {
       const historyIds = new Set(
         history
@@ -163,33 +190,29 @@ export function ChatView() {
           .map((m) => m.uuid as string | undefined)
           .filter(Boolean),
       );
-      const newLiveMessages = relevantLiveMessages.filter((m) => {
+      const newLiveMessages = liveMessages.filter((m) => {
         if (typeof m !== "object" || m === null) return true;
         const id = (m as Record<string, unknown>).uuid as string | undefined;
         return !id || !historyIds.has(id);
       });
       return [...history, ...newLiveMessages];
     }
-    return history.length > 0 ? history : relevantLiveMessages;
+    return history.length > 0 ? history : liveMessages;
   })();
-
-  const isLive = isRunning && isViewingLiveSession;
-
-  const showPermissionBlock =
-    pendingPermission !== null &&
-    (liveSessionId === null || pendingPermission.sessionId === liveSessionId);
 
   return (
     <div className="flex h-full flex-col">
       <ChatHeader />
       <div className="flex min-h-0 flex-1 flex-col">
-        {isLoadingHistory && !isViewingLiveSession && !hasLiveMessages ? (
-          <MessageLoadingSkeleton />
-        ) : (
-          <MessageStream messages={messages} isLive={isLive} />
-        )}
+        <ErrorBoundary fallbackMessage="Failed to render messages">
+          {isLoadingHistory && !isRunning && !hasLiveMessages ? (
+            <MessageLoadingSkeleton />
+          ) : (
+            <MessageStream messages={messages} isLive={isRunning} />
+          )}
+        </ErrorBoundary>
       </div>
-      {showPermissionBlock && (
+      {pendingPermission !== null && (
         <PermissionRequestBlock
           request={pendingPermission}
           onAllow={handleAllow}

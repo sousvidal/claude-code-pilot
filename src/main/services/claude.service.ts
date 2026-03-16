@@ -7,13 +7,19 @@ import { logger } from "../lib/logger";
 
 const log = logger.child({ service: "claude" });
 
-let activeProcess: ChildProcess | null = null;
-let currentSessionId: string | null = null;
-let savedCwd: string = process.cwd();
-let savedModel: string = "sonnet";
-let savedEffort: string = "high";
+interface ProcessContext {
+  process: ChildProcess;
+  sessionId: string | null;
+  cwd: string;
+  model: string;
+  effort: string;
+}
+
+// Active processes keyed by correlationId
+const activeSessions = new Map<string, ProcessContext>();
 
 async function runOneTurn(
+  correlationId: string,
   prompt: string,
   cwd: string,
   model: string,
@@ -57,14 +63,12 @@ async function runOneTurn(
   if (resume) args.push("--resume", resume);
 
   const env = { ...process.env };
-  // Remove vars that interfere with Claude Code's own auth.
-  // When launched as a GUI app these are never inherited; in dev mode they bleed
-  // in from the terminal. Explicitly clearing them replicates the clean GUI env.
   delete env.CLAUDECODE;
   delete env.ANTHROPIC_API_KEY;
 
   const child = spawn("claude", args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
-  activeProcess = child;
+  const ctx: ProcessContext = { process: child, sessionId: resume ?? null, cwd, model, effort };
+  activeSessions.set(correlationId, ctx);
 
   const msg = JSON.stringify({
     type: "user",
@@ -83,9 +87,9 @@ async function runOneTurn(
         parsed.subtype === "init" &&
         typeof parsed.session_id === "string"
       ) {
-        currentSessionId = parsed.session_id;
+        ctx.sessionId = parsed.session_id;
       }
-      mainWindow.webContents.send("claude:message", parsed);
+      mainWindow.webContents.send("claude:message", { ...parsed, correlationId });
     } catch {
       // ignore non-JSON stdout lines
     }
@@ -100,28 +104,29 @@ async function runOneTurn(
 
   return new Promise<void>((resolve, reject) => {
     child.on("close", (code) => {
-      if (activeProcess === child) activeProcess = null;
+      const sessionId = ctx.sessionId;
+      activeSessions.delete(correlationId);
       rl.close();
-      mainWindow.webContents.send("claude:done");
+      mainWindow.webContents.send("claude:done", { correlationId, sessionId });
       const wasKilled = code === null || code === 143 || code === 137;
       if (code === 0 || wasKilled) {
         resolve();
       } else {
         const message = stderr.trim() || `claude exited with code ${code}`;
-        mainWindow.webContents.send("claude:error", { message });
+        mainWindow.webContents.send("claude:error", { message, correlationId });
         reject(new Error(message));
       }
     });
 
     child.on("error", (err: NodeJS.ErrnoException) => {
-      if (activeProcess === child) activeProcess = null;
+      activeSessions.delete(correlationId);
       rl.close();
       const message =
         err.code === "ENOENT"
           ? "Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
           : `Failed to start Claude: ${err.message}`;
-      mainWindow.webContents.send("claude:error", { message });
-      mainWindow.webContents.send("claude:done");
+      mainWindow.webContents.send("claude:error", { message, correlationId });
+      mainWindow.webContents.send("claude:done", { correlationId, sessionId: null });
       reject(new Error(message));
     });
   });
@@ -136,48 +141,41 @@ export const claudeService = {
     const model = (options.model as string) ?? "sonnet";
     const effort = (options.effort as string) ?? "high";
     const resume = options.resume as string | undefined;
+    const correlationId = (options.correlationId as string) ?? crypto.randomUUID();
 
-    log.info({ cwd, model, effort }, "starting new claude session");
-
-    savedCwd = cwd;
-    savedModel = model;
-    savedEffort = effort;
-    if (resume) currentSessionId = resume;
+    log.info({ cwd, model, effort, correlationId }, "starting claude session");
 
     try {
-      await runOneTurn(prompt, cwd, model, effort, resume);
-      log.info({ cwd }, "claude session completed");
+      await runOneTurn(correlationId, prompt, cwd, model, effort, resume);
+      log.info({ cwd, correlationId }, "claude session completed");
     } catch (error: unknown) {
       if (error instanceof Error) {
-        log.error({ cwd, err: error.message }, "claude session error");
+        log.error({ cwd, correlationId, err: error.message }, "claude session error");
       }
     }
   },
 
-  async sendMessage(message: string): Promise<void> {
-    try {
-      await runOneTurn(
-        message,
-        savedCwd,
-        savedModel,
-        savedEffort,
-        currentSessionId ?? undefined,
-      );
-      log.info({ cwd: savedCwd }, "claude turn completed");
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        log.error({ err: error.message }, "claude turn error");
-      }
-    }
-  },
+  async cancelSession(options?: Record<string, unknown>): Promise<void> {
+    const sessionId = options?.sessionId as string | undefined;
 
-  async cancelSession(): Promise<void> {
-    if (activeProcess) {
-      log.info("cancelling active claude session");
-      activeProcess.kill("SIGTERM");
-      activeProcess = null;
+    if (sessionId) {
+      // Cancel the specific session matching this sessionId
+      for (const [correlationId, ctx] of activeSessions) {
+        if (ctx.sessionId === sessionId) {
+          log.info({ correlationId, sessionId }, "cancelling claude session");
+          ctx.process.kill("SIGTERM");
+          activeSessions.delete(correlationId);
+          return;
+        }
+      }
+    } else {
+      // Cancel all active sessions
+      for (const [correlationId, ctx] of activeSessions) {
+        log.info({ correlationId }, "cancelling claude session");
+        ctx.process.kill("SIGTERM");
+      }
+      activeSessions.clear();
     }
-    currentSessionId = null;
   },
 
   async setModel(_model: string): Promise<void> {},

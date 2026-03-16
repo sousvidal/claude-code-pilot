@@ -14,9 +14,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { useEditorStore } from "~/stores/editor";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
 import { FileExplorer } from "~/components/files/FileExplorer";
+import { CodeEditor } from "~/components/editor/CodeEditor";
 
 export function AppLayout() {
   const {
@@ -25,6 +27,7 @@ export function AppLayout() {
     toggleLeftSidebar,
     toggleRightSidebar,
   } = useUIStore();
+  const activeFilePath = useEditorStore((s) => s.activeFilePath);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -118,6 +121,15 @@ export function AppLayout() {
           <ChatView />
         </ResizablePanel>
 
+        {activeFilePath && (
+          <>
+            <ResizableHandle />
+            <ResizablePanel defaultSize={35} minSize={20} order={3}>
+              <CodeEditor />
+            </ResizablePanel>
+          </>
+        )}
+
         {!rightSidebarCollapsed && (
           <>
             <ResizableHandle />
@@ -125,7 +137,7 @@ export function AppLayout() {
               defaultSize={20}
               minSize={15}
               maxSize={35}
-              order={3}
+              order={4}
             >
               <FileExplorer />
             </ResizablePanel>

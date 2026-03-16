@@ -72,7 +72,7 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
     );
   }
 
-  const content = result.content;
+  const content = typeof result.content === "string" ? result.content : String(result.content ?? "");
   const path = typeof input.path === "string" ? input.path : undefined;
 
   switch (toolName) {

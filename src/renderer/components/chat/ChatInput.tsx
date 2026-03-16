@@ -19,21 +19,28 @@ const MAX_TEXTAREA_HEIGHT = 144; // 6 lines × 24px line-height
 
 export function ChatInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const currentRunCorrelationIdRef = useRef<string | null>(null);
   const [input, setInput] = useState("");
   const [effort, setEffort] = useState<"low" | "medium" | "high">("high");
   const [selectedModel, setSelectedModel] = useState("sonnet");
 
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
-  const isRunning = useLiveSessionStore((s) => s.isRunning);
-  const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
-  const setRunning = useLiveSessionStore((s) => s.setRunning);
-  const resetLiveSession = useLiveSessionStore((s) => s.resetLiveSession);
-  const setCurrentModel = useLiveSessionStore((s) => s.setCurrentModel);
-  const addMessage = useLiveSessionStore((s) => s.addMessage);
+  const setPendingNewSession = useSessionsStore((s) => s.setPendingNewSession);
 
-  const shouldContinueSession =
-    liveSessionId !== null && liveSessionId === activeSessionId;
+  const startRun = useLiveSessionStore((s) => s.startRun);
+  const endRun = useLiveSessionStore((s) => s.endRun);
+  const setCurrentModel = useLiveSessionStore((s) => s.setCurrentModel);
+  const addMessageToRun = useLiveSessionStore((s) => s.addMessageToRun);
+
+  // The active session is "running" if there is a run whose sessionId matches, or
+  // (for new chats with no activeSessionId) if there is any run with no sessionId yet.
+  const isRunning = useLiveSessionStore((s) => {
+    if (activeSessionId) {
+      return [...s.runningSessions.values()].some((r) => r.sessionId === activeSessionId);
+    }
+    return [...s.runningSessions.values()].some((r) => r.sessionId === null);
+  });
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -41,56 +48,58 @@ export function ChatInput() {
 
     setInput("");
 
+    const correlationId = crypto.randomUUID();
+    currentRunCorrelationIdRef.current = correlationId;
+
     const userMsg = {
       type: "user",
       message: { role: "user", content: [{ type: "text", text }] },
       timestamp: new Date().toISOString(),
     };
 
-    if (shouldContinueSession) {
-      resetLiveSession();
-      setRunning(true);
-      addMessage(userMsg);
-      try {
-        await window.api.claude.send(text);
-      } finally {
-        setRunning(false);
-      }
-    } else {
-      resetLiveSession();
-      setRunning(true);
-      setCurrentModel(selectedModel);
-      addMessage(userMsg);
-      try {
-        await window.api.claude.start(text, {
-          cwd: activeProjectPath ?? undefined,
-          model: selectedModel,
-          effort,
-          resume: activeSessionId ?? undefined,
-        });
-      } finally {
-        setRunning(false);
-      }
+    if (!activeSessionId) {
+      // New chat — show optimistic pending entry in sidebar
+      setPendingNewSession({ projectPath: activeProjectPath!, firstPrompt: text });
+    }
+
+    startRun(correlationId);
+    setCurrentModel(selectedModel);
+    addMessageToRun(correlationId, userMsg);
+
+    try {
+      await window.api.claude.start(text, {
+        cwd: activeProjectPath ?? undefined,
+        model: selectedModel,
+        effort,
+        resume: activeSessionId ?? undefined,
+        correlationId,
+      });
+    } finally {
+      endRun(correlationId);
+      currentRunCorrelationIdRef.current = null;
     }
   }, [
     input,
     isRunning,
-    shouldContinueSession,
+    activeSessionId,
+    activeProjectPath,
     selectedModel,
     effort,
-    activeProjectPath,
-    activeSessionId,
-    setRunning,
-    resetLiveSession,
+    setPendingNewSession,
+    startRun,
+    endRun,
     setCurrentModel,
-    addMessage,
+    addMessageToRun,
   ]);
 
   const handleCancel = useCallback(() => {
-    window.api.claude.cancel();
-    setRunning(false);
-    resetLiveSession();
-  }, [setRunning, resetLiveSession]);
+    window.api.claude.cancel(activeSessionId ?? undefined);
+    // Immediately remove the run for instant UI feedback
+    if (currentRunCorrelationIdRef.current) {
+      endRun(currentRunCorrelationIdRef.current);
+      currentRunCorrelationIdRef.current = null;
+    }
+  }, [activeSessionId, endRun]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

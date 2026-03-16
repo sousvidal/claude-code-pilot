@@ -4,17 +4,21 @@ interface SessionsState {
   activeSessionId: string | null;
   activeProjectPath: string | null;
   scrollPositions: Record<string, number>;
+  pendingNewSession: { projectPath: string; firstPrompt: string } | null;
 
   setActiveSession: (sessionId: string, projectPath: string) => void;
   setActiveProjectPath: (path: string | null) => void;
   clearActiveSession: () => void;
   setScrollPosition: (sessionId: string, position: number) => void;
+  setPendingNewSession: (data: { projectPath: string; firstPrompt: string }) => void;
+  clearPendingNewSession: () => void;
 }
 
 export const useSessionsStore = create<SessionsState>((set) => ({
   activeSessionId: null,
   activeProjectPath: null,
   scrollPositions: {},
+  pendingNewSession: null,
 
   setActiveSession: (sessionId, projectPath) => {
     console.info("[sessions] setActiveSession", { sessionId, projectPath });
@@ -35,4 +39,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
     set((state) => ({
       scrollPositions: { ...state.scrollPositions, [sessionId]: position },
     })),
+
+  setPendingNewSession: (data) => set({ pendingNewSession: data }),
+  clearPendingNewSession: () => set({ pendingNewSession: null }),
 }));

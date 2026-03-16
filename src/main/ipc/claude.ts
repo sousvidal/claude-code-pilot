@@ -9,17 +9,16 @@ export function registerClaudeHandlers(): void {
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
+
   ipcMain.handle(
     "claude:start",
     (_event, prompt: string, options: Record<string, unknown>) =>
       claudeService.startSession(prompt, options),
   );
 
-  ipcMain.handle("claude:send", (_event, message: string) =>
-    claudeService.sendMessage(message),
+  ipcMain.handle("claude:cancel", (_event, options?: Record<string, unknown>) =>
+    claudeService.cancelSession(options),
   );
-
-  ipcMain.handle("claude:cancel", () => claudeService.cancelSession());
 
   ipcMain.handle("claude:setModel", (_event, model: string) =>
     claudeService.setModel(model),

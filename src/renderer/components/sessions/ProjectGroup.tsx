@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronRight, Folder, Plus } from "lucide-react";
 
 import {
@@ -24,11 +25,14 @@ interface SessionInfo {
   firstPrompt?: string;
 }
 
+const VISIBLE_COUNT = 5;
+
 interface ProjectGroupProps {
   path: string;
   displayName: string;
   sessions: SessionInfo[];
   activeSessionId: string | null;
+  isActiveGroup: boolean;
   onNewChat: (path: string) => void;
 }
 
@@ -37,10 +41,15 @@ export function ProjectGroup({
   displayName,
   sessions,
   activeSessionId,
+  isActiveGroup,
   onNewChat,
 }: ProjectGroupProps) {
+  const [showAll, setShowAll] = useState(false);
+  const hiddenCount = sessions.length - VISIBLE_COUNT;
+  const visibleSessions = showAll || hiddenCount <= 0 ? sessions : sessions.slice(0, VISIBLE_COUNT);
+
   return (
-    <Collapsible defaultOpen>
+    <Collapsible defaultOpen={isActiveGroup}>
       <TooltipProvider delayDuration={500}>
         <div className="group flex w-full items-center rounded-md hover:bg-card-hover transition-colors duration-100">
           <Tooltip>
@@ -87,7 +96,7 @@ export function ProjectGroup({
 
       <CollapsibleContent>
         <div className="ml-3 flex flex-col gap-0.5 border-l border-border/50 pl-2 pt-1">
-          {sessions.map((session) => (
+          {visibleSessions.map((session) => (
             <SessionItem
               key={session.sessionId}
               session={session}
@@ -95,6 +104,14 @@ export function ProjectGroup({
               isActive={session.sessionId === activeSessionId}
             />
           ))}
+          {!showAll && hiddenCount > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground transition-colors duration-100"
+            >
+              {hiddenCount} more...
+            </button>
+          )}
         </div>
       </CollapsibleContent>
     </Collapsible>

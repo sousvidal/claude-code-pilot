@@ -9,13 +9,12 @@ interface Window {
     };
     claude: {
       start: (prompt: string, options: Record<string, unknown>) => Promise<void>;
-      send: (message: string) => Promise<void>;
-      cancel: () => Promise<void>;
+      cancel: (sessionId?: string) => Promise<void>;
       setModel: (model: string) => Promise<void>;
       models: () => Promise<unknown[]>;
       onMessage: (callback: (message: unknown) => void) => () => void;
       onError: (callback: (error: unknown) => void) => () => void;
-      onDone: (callback: () => void) => () => void;
+      onDone: (callback: (event: { correlationId: string; sessionId: string | null }) => void) => () => void;
     };
     files: {
       readDir: (dirPath: string) => Promise<FileTreeNode[]>;

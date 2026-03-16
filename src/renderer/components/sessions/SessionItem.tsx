@@ -17,27 +17,29 @@ interface SessionItemProps {
   session: SessionInfo;
   projectPath: string;
   isActive: boolean;
+  projectLabel?: string;
 }
 
 export function SessionItem({
   session,
   projectPath,
   isActive,
+  projectLabel,
 }: SessionItemProps) {
   const setActiveSession = useSessionsStore((s) => s.setActiveSession);
-  const isRunning = useLiveSessionStore((s) => s.isRunning);
-  const liveSessionId = useLiveSessionStore((s) => s.liveSessionId);
-  const permissionQueue = useLiveSessionStore((s) => s.permissionQueue);
   const unseenSessionIds = useLiveSessionStore((s) => s.unseenSessionIds);
   const clearSessionUnseen = useLiveSessionStore((s) => s.clearSessionUnseen);
 
-  const isSessionRunning = isRunning && liveSessionId === session.sessionId;
-  const hasPendingApproval =
-    permissionQueue.length > 0 &&
-    liveSessionId === session.sessionId &&
-    !isActive;
-  const hasUnseenUpdate =
-    unseenSessionIds.includes(session.sessionId) && !isActive;
+  const isSessionRunning = useLiveSessionStore((s) =>
+    [...s.runningSessions.values()].some((r) => r.sessionId === session.sessionId),
+  );
+
+  const hasPendingApproval = useLiveSessionStore((s) => {
+    const run = [...s.runningSessions.values()].find((r) => r.sessionId === session.sessionId);
+    return (run?.permissionQueue.length ?? 0) > 0 && !isActive;
+  });
+
+  const hasUnseenUpdate = unseenSessionIds.includes(session.sessionId) && !isActive;
 
   const displayText = session.summary || session.firstPrompt || "Untitled session";
 
@@ -71,6 +73,11 @@ export function SessionItem({
         <span className="text-xs text-muted-foreground">
           {formatRelativeTime(session.lastModified)}
         </span>
+        {projectLabel && (
+          <span className="text-xs text-muted-foreground/60 truncate">
+            {projectLabel}
+          </span>
+        )}
         {session.gitBranch && (
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
             <GitBranch className="h-3 w-3" />

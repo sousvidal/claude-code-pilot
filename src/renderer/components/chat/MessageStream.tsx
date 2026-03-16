@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -12,10 +12,13 @@ interface MessageStreamProps {
 }
 
 export function MessageStream({ messages, isLive }: MessageStreamProps) {
-  const parentMessages = messages.filter(
-    (m) => !(m as { parent_tool_use_id?: string | null }).parent_tool_use_id,
+  const parentMessages = useMemo(
+    () => messages.filter(
+      (m) => !(m as { parent_tool_use_id?: string | null }).parent_tool_use_id,
+    ),
+    [messages],
   );
-  const turns = parseTurns(parentMessages);
+  const turns = useMemo(() => parseTurns(parentMessages), [parentMessages]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
