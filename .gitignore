@@ -1,0 +1,12 @@
+.DS_Store
+.env
+/node_modules/
+
+# Electron-vite
+/out/
+/dist/
+
+# Prisma
+/generated/prisma
+/prisma/*.db
+/prisma/*.db-journal
