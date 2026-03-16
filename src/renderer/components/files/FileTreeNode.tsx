@@ -20,11 +20,11 @@ import { FileTree } from "./FileTree";
 
 const INDENT_CLASSES = [
   "pl-0",
-  "pl-4",
-  "pl-8",
+  "pl-3",
+  "pl-6",
+  "pl-9",
   "pl-12",
-  "pl-16",
-  "pl-20",
+  "pl-15",
 ] as const;
 
 function getFileIcon(extension?: string) {

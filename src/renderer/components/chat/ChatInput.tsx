@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
-import { Send, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, Send, X } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -8,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Toggle } from "~/components/ui/toggle";
 import { cn } from "~/lib/utils";
 import { useLiveSessionStore } from "~/stores/liveSession";
 import { useSessionsStore } from "~/stores/sessions";
@@ -111,6 +110,12 @@ export function ChatInput() {
     [handleSend],
   );
 
+  useEffect(() => {
+    if (!isRunning) textareaRef.current?.focus();
+  }, [isRunning]);
+
+  if (!activeProjectPath) return null;
+
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     const el = e.target;
@@ -121,74 +126,81 @@ export function ChatInput() {
   return (
     <div className="shrink-0 border-t border-border bg-card/80 px-4 py-3 backdrop-blur-sm">
       <div className="mx-auto max-w-3xl">
-        <textarea
-          data-chat-input
-          ref={textareaRef}
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          disabled={isRunning}
-          placeholder={isRunning ? "Claude is thinking..." : "Type your message..."}
-          rows={1}
-          className={cn(
-            "w-full resize-none rounded-xl bg-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-70",
-            "min-h-[40px] max-h-[144px]",
+        <div className="flex items-end gap-2">
+          <textarea
+            data-chat-input
+            ref={textareaRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            disabled={isRunning}
+            placeholder={isRunning ? "Claude is thinking..." : "Type your message..."}
+            autoFocus
+            rows={1}
+            className={cn(
+              "flex-1 resize-none rounded-xl bg-muted px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-70",
+              "min-h-[40px] max-h-[144px]",
+            )}
+          />
+          {isRunning ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 shrink-0 rounded-full text-accent-red hover:bg-accent-red/10 hover:text-accent-red"
+              onClick={handleCancel}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full bg-accent-blue text-white hover:bg-accent-blue/90"
+              onClick={handleSend}
+              disabled={!input.trim() || !activeProjectPath}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
           )}
-        />
-        <div className="mt-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-0.5 rounded-md border border-border bg-muted/50 p-0.5">
+        </div>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex h-5 items-center gap-0.5 rounded px-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
+                <span className="capitalize">{effort}</span>
+                <ChevronDown className="h-2.5 w-2.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
               {EFFORT_LEVELS.map((level) => (
-                <Toggle
+                <DropdownMenuItem
                   key={level}
-                  size="sm"
-                  pressed={effort === level}
-                  onPressedChange={() => setEffort(level)}
-                  className="h-7 px-2 text-xs capitalize"
+                  onClick={() => setEffort(level)}
+                  className={cn("capitalize", effort === level && "font-medium")}
                 >
                   {level}
-                </Toggle>
+                </DropdownMenuItem>
               ))}
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs">
-                  {selectedModel}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {MODELS.map((model) => (
-                  <DropdownMenuItem
-                    key={model}
-                    onClick={() => setSelectedModel(model)}
-                  >
-                    {model}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <div className="flex items-center gap-1">
-            {isRunning ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9 rounded-full text-accent-red hover:bg-accent-red/10 hover:text-accent-red"
-                onClick={handleCancel}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="icon"
-                className="h-9 w-9 rounded-full bg-accent-blue text-white hover:bg-accent-blue/90"
-                onClick={handleSend}
-                disabled={!input.trim() || !activeProjectPath}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex h-5 items-center gap-0.5 rounded px-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
+                <span>{selectedModel}</span>
+                <ChevronDown className="h-2.5 w-2.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {MODELS.map((model) => (
+                <DropdownMenuItem
+                  key={model}
+                  onClick={() => setSelectedModel(model)}
+                  className={cn(selectedModel === model && "font-medium")}
+                >
+                  {model}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

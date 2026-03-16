@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld("api", {
     readDir: (dirPath: string) => ipcRenderer.invoke("files:readDir", dirPath),
     readFile: (filePath: string) =>
       ipcRenderer.invoke("files:readFile", filePath),
+    writeFile: (filePath: string, content: string) =>
+      ipcRenderer.invoke("files:writeFile", filePath, content),
   },
   dialog: {
     openDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),

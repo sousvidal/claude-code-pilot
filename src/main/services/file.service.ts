@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from "fs/promises";
+import { readdir, readFile, stat, writeFile } from "fs/promises";
 import { join, extname } from "path";
 import type { FileTreeNode } from "../../shared/types";
 
@@ -47,5 +47,9 @@ export const fileService = {
     }
     const content = await readFile(filePath, "utf-8");
     return content;
+  },
+
+  async writeFile(filePath: string, content: string): Promise<void> {
+    await writeFile(filePath, content, "utf-8");
   },
 };

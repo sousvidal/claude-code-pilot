@@ -6,5 +6,7 @@ export function useFilesService() {
       window.api.files.readDir(dirPath),
     readFile: (filePath: string): Promise<string> =>
       window.api.files.readFile(filePath),
+    writeFile: (filePath: string, content: string): Promise<void> =>
+      window.api.files.writeFile(filePath, content),
   };
 }

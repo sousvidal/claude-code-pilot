@@ -1,6 +1,6 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 
@@ -57,7 +57,14 @@ export function CodeEditor() {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const activeFilePath = useEditorStore((s) => s.activeFilePath);
   const closeFile = useEditorStore((s) => s.closeFile);
-  const { readFile } = useFilesService();
+  const { readFile, writeFile } = useFilesService();
+  const queryClient = useQueryClient();
+  const [isDirty, setIsDirty] = useState(false);
+  const prevFilePathRef = useRef<string | null>(null);
+  if (activeFilePath !== prevFilePathRef.current) {
+    prevFilePathRef.current = activeFilePath;
+    if (isDirty) setIsDirty(false);
+  }
 
   const { data: content, isLoading } = useQuery({
     queryKey: ["fileContent", activeFilePath],
@@ -65,9 +72,25 @@ export function CodeEditor() {
     enabled: Boolean(activeFilePath),
   });
 
+  const handleSave = useCallback(async () => {
+    if (!activeFilePath || !editorRef.current) return;
+    const value = editorRef.current.getValue();
+    await writeFile(activeFilePath, value);
+    await queryClient.invalidateQueries({ queryKey: ["fileContent", activeFilePath] });
+    setIsDirty(false);
+  }, [activeFilePath, writeFile, queryClient]);
+
   const handleEditorMount = useCallback(
     (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
       editorRef.current = editorInstance;
+
+      editorInstance.onDidChangeModelContent(() => {
+        setIsDirty(true);
+      });
+
+      editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        handleSave();
+      });
 
       monaco.editor.defineTheme("clay-dark", {
         base: "vs-dark",
@@ -96,7 +119,7 @@ export function CodeEditor() {
 
       monaco.editor.setTheme("clay-dark");
     },
-    [],
+    [handleSave],
   );
 
   if (!activeFilePath) {
@@ -115,6 +138,7 @@ export function CodeEditor() {
         <div className="flex items-center gap-2 min-w-0">
           <span className="truncate text-sm text-foreground">
             {getFileName(activeFilePath)}
+            {isDirty && <span className="ml-1 text-muted-foreground">•</span>}
           </span>
           <span
             className="truncate text-xs text-muted-foreground"
@@ -141,7 +165,6 @@ export function CodeEditor() {
           onMount={handleEditorMount}
           theme="clay-dark"
           options={{
-            readOnly: true,
             minimap: { enabled: false },
             fontSize: 13,
             fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', monospace",

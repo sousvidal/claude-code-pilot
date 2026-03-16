@@ -9,4 +9,8 @@ export function registerFileHandlers(): void {
   ipcMain.handle("files:readFile", (_event, filePath: string) =>
     fileService.readFile(filePath),
   );
+
+  ipcMain.handle("files:writeFile", (_event, filePath: string, content: string) =>
+    fileService.writeFile(filePath, content),
+  );
 }

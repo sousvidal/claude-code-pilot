@@ -19,6 +19,7 @@ interface Window {
     files: {
       readDir: (dirPath: string) => Promise<FileTreeNode[]>;
       readFile: (filePath: string) => Promise<string>;
+      writeFile: (filePath: string, content: string) => Promise<void>;
     };
     dialog: {
       openDirectory: () => Promise<string | null>;

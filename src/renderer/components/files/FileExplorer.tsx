@@ -17,11 +17,11 @@ import { FileTree } from "./FileTree";
 
 const INDENT_CLASSES = [
   "pl-0",
-  "pl-4",
-  "pl-8",
+  "pl-3",
+  "pl-6",
+  "pl-9",
   "pl-12",
-  "pl-16",
-  "pl-20",
+  "pl-15",
 ] as const;
 
 function SkeletonLine({ depth }: { depth: number }) {
@@ -73,7 +73,7 @@ export function FileExplorer() {
         "flex h-full flex-col bg-card border-l border-border",
       )}
     >
-      <div className="flex flex-col gap-1 border-b border-border px-3 py-2">
+      <div className="flex flex-col gap-1 border-b border-border px-2 py-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             FILES
