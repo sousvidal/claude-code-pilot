@@ -63,6 +63,7 @@ export function SessionItem({
     mutationFn: () => deleteSession(session.sessionId, session.cwd),
     onSuccess: () => {
       if (activeSessionId === session.sessionId) clearActiveSession();
+      unpinSession(session.sessionId);
       void queryClient.invalidateQueries({ queryKey: ["sessions"] });
       toast.success("Session deleted");
     },
