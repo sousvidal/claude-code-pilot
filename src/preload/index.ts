@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld("api", {
     setState: (partial: Record<string, unknown>) =>
       ipcRenderer.invoke("app:setState", partial),
   },
+  commands: {
+    list: (projectPath?: string) => ipcRenderer.invoke("commands:list", projectPath),
+  },
   permission: {
     onRequest: (callback: (request: PermissionRequest) => void) => {
       const handler = (_event: IpcRendererEvent, request: PermissionRequest) =>

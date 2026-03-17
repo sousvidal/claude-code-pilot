@@ -1,4 +1,4 @@
-import type { AutoApprovedEvent, FileTreeNode, PermissionRequest } from "./types";
+import type { AutoApprovedEvent, FileTreeNode, PermissionRequest, SlashCommand } from "./types";
 
 interface PersistedAppState {
   openProjects: string[];
@@ -59,6 +59,9 @@ interface Window {
     };
     shell: {
       openExternal: (url: string) => Promise<void>;
+    };
+    commands: {
+      list: (projectPath?: string) => Promise<SlashCommand[]>;
     };
     permission: {
       onRequest: (callback: (request: PermissionRequest) => void) => () => void;

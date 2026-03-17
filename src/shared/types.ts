@@ -75,6 +75,12 @@ export interface PermissionRequest {
   toolInput: Record<string, unknown>;
 }
 
+export interface SlashCommand {
+  name: string;
+  description: string;
+  source: "builtin" | "user" | "project";
+}
+
 export interface AutoApprovedEvent {
   toolName: string;
   toolUseId: string;
