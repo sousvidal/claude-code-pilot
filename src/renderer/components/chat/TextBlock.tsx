@@ -2,6 +2,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { cn } from "~/lib/utils";
+import { CopyButton } from "~/components/ui/copy-button";
+import { CodeHighlight } from "./CodeHighlight";
 
 interface TextBlockProps {
   text: string;
@@ -13,17 +15,19 @@ export function TextBlock({ text }: TextBlockProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code: ({ className, children, ...props }) => {
-            const isBlock = className?.includes("language-");
-            return isBlock ? (
-              <pre className="rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] overflow-x-auto my-2">
-                <code {...props}>{children}</code>
-              </pre>
-            ) : (
-              <code
-                className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-[13px]")}
-                {...props}
-              >
+          code: ({ className, children }) => {
+            const langMatch = className?.match(/language-(\w+)/);
+            if (langMatch) {
+              const code = String(children).replace(/\n$/, "");
+              return (
+                <div className="relative my-2 group/code">
+                  <CopyButton text={code} />
+                  <CodeHighlight code={code} lang={langMatch[1]} />
+                </div>
+              );
+            }
+            return (
+              <code className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-[13px]")}>
                 {children}
               </code>
             );
