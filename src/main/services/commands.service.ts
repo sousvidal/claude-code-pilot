@@ -35,16 +35,22 @@ async function extractDescription(filePath: string): Promise<string> {
 
 async function readCommandsFromDir(dir: string, source: SlashCommand["source"]): Promise<SlashCommand[]> {
   try {
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    return Promise.all(
+    const realDir = await fs.promises.realpath(dir);
+    const entries = await fs.promises.readdir(realDir, { withFileTypes: true });
+    const results = await Promise.all(
       entries
         .filter((e) => e.isFile() && e.name.endsWith(".md"))
         .map(async (e) => {
+          const filePath = path.join(realDir, e.name);
+          const realFilePath = await fs.promises.realpath(filePath).catch(() => null);
+          // Reject any entry whose resolved path escapes the commands directory
+          if (!realFilePath || !realFilePath.startsWith(realDir + path.sep)) return null;
           const name = e.name.slice(0, -3);
-          const description = await extractDescription(path.join(dir, e.name));
-          return { name, description, source };
+          const description = await extractDescription(realFilePath);
+          return { name, description, source } satisfies SlashCommand;
         }),
     );
+    return results.filter((cmd): cmd is SlashCommand => cmd !== null);
   } catch {
     return [];
   }
