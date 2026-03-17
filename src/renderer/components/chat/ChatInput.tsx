@@ -125,7 +125,7 @@ export function ChatInput() {
 
   return (
     <div className="shrink-0 border-t border-border bg-card/80 px-4 py-3 backdrop-blur-sm">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-6xl">
         <div className="flex items-end gap-2">
           <textarea
             data-chat-input

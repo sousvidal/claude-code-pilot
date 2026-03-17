@@ -23,7 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { cn, truncate } from "~/lib/utils";
+import { cn } from "~/lib/utils";
 import { useLiveSessionStore } from "~/stores/liveSession";
 import type { ToolResult } from "../../../shared/types";
 import { ToolResultContent } from "./ToolResultContent";
@@ -73,11 +73,11 @@ function getSummary(toolName: string, input: Record<string, unknown>): string {
       return typeof input.path === "string" ? input.path : "—";
     case "Bash":
       return typeof input.command === "string"
-        ? truncate(input.command, 50)
+        ? input.command
         : "—";
     case "WebSearch":
       return typeof input.search_term === "string"
-        ? `"${truncate(input.search_term, 40)}"`
+        ? `"${input.search_term}"`
         : "—";
     case "Edit":
       return typeof input.path === "string" ? input.path : "—";
@@ -91,14 +91,14 @@ function getSummary(toolName: string, input: Record<string, unknown>): string {
         : "—";
     case "WebFetch":
       return typeof input.url === "string"
-        ? truncate(input.url, 50)
+        ? input.url
         : "—";
     case "Grep":
       return typeof input.pattern === "string" ? input.pattern : "—";
     case "Agent":
     case "Task":
       return typeof input.description === "string"
-        ? truncate(input.description, 40)
+        ? input.description
         : "—";
     default:
       return "—";

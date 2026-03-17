@@ -5,7 +5,6 @@ import { useLiveSessionStore } from "~/stores/liveSession";
 import { useSessionsStore } from "~/stores/sessions";
 import { useSessionsService } from "~/services/sessions.service";
 import { parseTurns } from "~/lib/parse-turns";
-import { truncate } from "~/lib/utils";
 import { ErrorBoundary } from "~/components/ui/error-boundary";
 import type { ToolResult } from "../../../shared/types";
 import { SubAgentBlock } from "./SubAgentBlock";
@@ -53,9 +52,9 @@ export function AgentToolBlock({ toolName, toolUseId, input, result, isLive, isR
   const agentIsRunning = isRunning ?? Boolean(isLive && !result);
 
   const description = typeof input.description === "string"
-    ? truncate(input.description, 50)
+    ? input.description
     : typeof input.prompt === "string"
-      ? truncate(input.prompt, 50)
+      ? input.prompt
       : "—";
 
   return (
