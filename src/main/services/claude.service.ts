@@ -369,7 +369,7 @@ export const claudeService = {
     email?: string;
   }> {
     return new Promise((resolve) => {
-      execFile("claude", ["auth", "status"], (err, stdout) => {
+      execFile("claude", ["auth", "status"], { timeout: 5000 }, (err, stdout) => {
         if (err) {
           resolve({ loggedIn: false });
           return;
