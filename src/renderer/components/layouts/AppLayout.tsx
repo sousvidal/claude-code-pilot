@@ -1,33 +1,74 @@
 import { useEffect } from "react";
-import { PanelLeft, PanelRight } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 
 import { useUIStore } from "~/stores/ui";
+import { useSessionsStore } from "~/stores/sessions";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "~/components/ui/resizable";
 import { Button } from "~/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
-import { useEditorStore } from "~/stores/editor";
+import { ActivityBar } from "./ActivityBar";
+import { ProjectTabBar } from "./ProjectTabBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
-import { FileExplorer } from "~/components/files/FileExplorer";
-import { CodeEditor } from "~/components/editor/CodeEditor";
+
+function SettingsPanel() {
+  return (
+    <div className="flex h-full flex-col bg-card">
+      <div className="border-b border-border px-3 py-2">
+        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+          Settings
+        </span>
+      </div>
+      <div className="flex flex-1 items-center justify-center p-4">
+        <p className="text-sm text-muted-foreground">Settings coming soon</p>
+      </div>
+    </div>
+  );
+}
+
+function SidebarContent() {
+  const activePanel = useUIStore((s) => s.activePanel);
+
+  switch (activePanel) {
+    case "sessions":
+      return <SessionBrowser />;
+    case "settings":
+      return <SettingsPanel />;
+  }
+}
+
+function EmptyView() {
+  const openProject = useSessionsStore((s) => s.openProject);
+
+  const handleOpenProject = async () => {
+    const path = await window.api.dialog.openDirectory();
+    if (path) openProject(path);
+  };
+
+  return (
+    <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-col items-center gap-6 text-center">
+        <div className="text-5xl font-bold text-muted-foreground/20">Clay</div>
+        <p className="text-sm text-muted-foreground">
+          Open a project to get started
+        </p>
+        <Button variant="outline" className="gap-2" onClick={handleOpenProject}>
+          <FolderOpen className="h-4 w-4" />
+          Open Project
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function AppLayout() {
-  const {
-    leftSidebarCollapsed,
-    rightSidebarCollapsed,
-    toggleLeftSidebar,
-    toggleRightSidebar,
-  } = useUIStore();
-  const activeFilePath = useEditorStore((s) => s.activeFilePath);
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const setActivePanel = useUIStore((s) => s.setActivePanel);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -38,18 +79,22 @@ export function AppLayout() {
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "b") {
           e.preventDefault();
-          toggleLeftSidebar();
-        }
-        if (e.key === "e") {
-          e.preventDefault();
-          toggleRightSidebar();
+          const panel = useUIStore.getState().activePanel;
+          if (panel === "sessions") {
+            toggleSidebar();
+          } else {
+            setActivePanel("sessions");
+          }
         }
         if (e.key === "k") {
           e.preventDefault();
           const searchInput = document.querySelector<HTMLInputElement>(
             "[data-search-sessions]",
           );
-          searchInput?.focus();
+          if (searchInput) {
+            setActivePanel("sessions");
+            searchInput.focus();
+          }
         }
       }
 
@@ -63,87 +108,41 @@ export function AppLayout() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleLeftSidebar, toggleRightSidebar]);
+  }, [setActivePanel, toggleSidebar]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
-      <div className="drag-region flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-card/80 px-2 backdrop-blur-sm">
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="no-drag ml-[68px] h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={toggleLeftSidebar}
-              >
-                <PanelLeft className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {leftSidebarCollapsed ? "Show" : "Hide"} sessions (⌘B)
-            </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="no-drag h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={toggleRightSidebar}
-              >
-                <PanelRight className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {rightSidebarCollapsed ? "Show" : "Hide"} files (⌘E)
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <div className="drag-region flex h-[38px] shrink-0 items-center border-b border-border bg-card/80 px-2 backdrop-blur-sm">
+        <ProjectTabBar />
       </div>
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {!leftSidebarCollapsed && (
-          <>
-            <ResizablePanel
-              defaultSize={20}
-              minSize={15}
-              maxSize={35}
-              order={1}
-            >
-              <SessionBrowser />
-            </ResizablePanel>
-            <ResizableHandle />
-          </>
-        )}
 
-        <ResizablePanel defaultSize={60} minSize={30} order={2}>
-          <ChatView />
-        </ResizablePanel>
+      {activeProjectPath ? (
+        <div className="flex flex-1 overflow-hidden">
+          <ActivityBar />
 
-        {activeFilePath && (
-          <>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={35} minSize={20} order={3}>
-              <CodeEditor />
-            </ResizablePanel>
-          </>
-        )}
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            {!sidebarCollapsed && (
+              <>
+                <ResizablePanel
+                  defaultSize={22}
+                  minSize={15}
+                  maxSize={40}
+                  order={1}
+                >
+                  <SidebarContent />
+                </ResizablePanel>
+                <ResizableHandle />
+              </>
+            )}
 
-        {!rightSidebarCollapsed && (
-          <>
-            <ResizableHandle />
-            <ResizablePanel
-              defaultSize={20}
-              minSize={15}
-              maxSize={35}
-              order={4}
-            >
-              <FileExplorer />
+            <ResizablePanel defaultSize={78} minSize={40} order={2}>
+              <ChatView />
             </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+          </ResizablePanelGroup>
+        </div>
+      ) : (
+        <EmptyView />
+      )}
     </div>
   );
 }
