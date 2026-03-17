@@ -1,7 +1,7 @@
 import { spawn, execFile } from "child_process";
 import type { ChildProcess } from "child_process";
 import { watch, type FSWatcher } from "fs";
-import { stat as fsStat, open as fsOpen, readdir } from "fs/promises";
+import { stat as fsStat, open as fsOpen, readdir, readFile } from "fs/promises";
 import { createInterface } from "readline";
 import { join } from "path";
 import { homedir } from "os";
@@ -341,7 +341,6 @@ export const claudeService = {
   }> {
     const statsPath = join(homedir(), ".claude", "stats-cache.json");
     try {
-      const { readFile } = await import("fs/promises");
       const raw = await readFile(statsPath, "utf-8");
       const data = JSON.parse(raw) as Record<string, unknown>;
       return {
