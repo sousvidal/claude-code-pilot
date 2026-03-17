@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
-import { Search, Plus, FolderOpen, Loader2 } from "lucide-react";
+import { Search, Plus, FolderOpen, Loader2, Pin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-
-import { Pin } from "lucide-react";
 
 import { useSessionsStore } from "~/stores/sessions";
 import { useSessionsService } from "~/services/sessions.service";
