@@ -110,12 +110,6 @@ export function ChatInput() {
     [handleSend],
   );
 
-  useEffect(() => {
-    if (!isRunning) textareaRef.current?.focus();
-  }, [isRunning]);
-
-  if (!activeProjectPath) return null;
-
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     const el = e.target;
@@ -123,9 +117,15 @@ export function ChatInput() {
     el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
   }, []);
 
+  useEffect(() => {
+    if (!isRunning) textareaRef.current?.focus();
+  }, [isRunning]);
+
+  if (!activeProjectPath) return null;
+
   return (
     <div className="shrink-0 border-t border-border bg-card/80 px-4 py-3 backdrop-blur-sm">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-6xl">
         <div className="flex items-end gap-2">
           <textarea
             data-chat-input

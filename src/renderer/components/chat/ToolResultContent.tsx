@@ -1,5 +1,7 @@
 import type { ToolResult } from "../../../shared/types";
-import { truncate } from "~/lib/utils";
+import { CopyButton } from "~/components/ui/copy-button";
+import { CodeHighlight } from "./CodeHighlight";
+import { EditDiffView } from "./EditDiffView";
 
 interface ToolResultContentProps {
   toolName: string;
@@ -55,12 +57,13 @@ function parseWebSearchResults(content: string): Array<{ title?: string; url?: s
   }
 }
 
-function parseDiff(content: string): Array<{ type: "add" | "remove" | "context"; line: string }> {
-  return content.split("\n").map((line) => {
-    if (line.startsWith("+")) return { type: "add" as const, line: line.slice(1) };
-    if (line.startsWith("-")) return { type: "remove" as const, line: line.slice(1) };
-    return { type: "context" as const, line };
-  });
+
+function FilePath({ path }: { path: string }) {
+  return (
+    <span className="font-mono text-xs text-muted-foreground">
+      {path}
+    </span>
+  );
 }
 
 export function ToolResultContent({ toolName, input, result }: ToolResultContentProps) {
@@ -80,12 +83,11 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
     case "Write":
       return (
         <div className="flex flex-col gap-2">
-          {path && (
-            <div className="font-mono text-xs text-muted-foreground">{path}</div>
-          )}
-          <pre className="max-h-64 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] text-foreground">
-            {content}
-          </pre>
+          {path && <FilePath path={path} />}
+          <div className="relative group/code">
+            <CopyButton text={content} />
+            <CodeHighlight code={content} filePath={path} />
+          </div>
         </div>
       );
 
@@ -98,9 +100,12 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
             <span className="text-accent-green">$</span> {cmd}
           </div>
           {stdout !== undefined && (
-            <pre className="max-h-48 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] text-foreground">
-              {stdout}
-            </pre>
+            <div className="relative group/code">
+              <CopyButton text={stdout} />
+              <pre className="max-h-48 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] text-foreground">
+                {stdout}
+              </pre>
+            </div>
           )}
           {stderr !== undefined && stderr.length > 0 && (
             <pre className="max-h-32 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] text-accent-red">
@@ -122,30 +127,14 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
     }
 
     case "Edit": {
-      const diffLines = parseDiff(content);
+      const oldString = typeof input.old_string === "string" ? input.old_string : "";
+      const newString = typeof input.new_string === "string" ? input.new_string : "";
       return (
-        <div className="flex flex-col gap-2">
-          {path && (
-            <div className="font-mono text-xs text-muted-foreground">{path}</div>
-          )}
-          <pre className="max-h-64 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px]">
-            {diffLines.map((d, i) => (
-              <div
-                key={i}
-                className={
-                  d.type === "add"
-                    ? "text-accent-green"
-                    : d.type === "remove"
-                      ? "text-accent-red"
-                      : "text-foreground"
-                }
-              >
-                {d.type === "add" ? "+" : d.type === "remove" ? "-" : " "}
-                {d.line}
-              </div>
-            ))}
-          </pre>
-        </div>
+        <EditDiffView
+          oldString={oldString}
+          newString={newString}
+          filePath={path}
+        />
       );
     }
 
@@ -159,7 +148,9 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
           </div>
           {results.map((r, i) => (
             <div key={i} className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
-              <div className="mb-1 font-mono text-xs text-accent-blue">{r.file}</div>
+              <div className="mb-1">
+                <FilePath path={r.file} />
+              </div>
               <div className="font-mono text-[13px] text-foreground">
                 {r.lines.map((line, j) => (
                   <div key={j}>{line}</div>
@@ -186,11 +177,13 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
               {r.url && (
                 <a
                   href={r.url}
-                  className="text-xs text-accent-blue hover:underline"
-                  target="_blank"
-                  rel="noreferrer"
+                  className="text-xs text-accent-blue hover:underline cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void window.api.shell.openExternal(r.url!);
+                  }}
                 >
-                  {truncate(r.url, 60)}
+                  {r.url}
                 </a>
               )}
               {r.snippet && (
@@ -218,9 +211,9 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
           <div className="text-xs text-muted-foreground">
             {files.length} file{files.length !== 1 ? "s" : ""} found
           </div>
-          <div className="max-h-48 overflow-auto font-mono text-[13px] text-foreground">
+          <div className="max-h-48 overflow-auto flex flex-col">
             {files.map((f, i) => (
-              <div key={i}>{f}</div>
+              <FilePath key={i} path={f} />
             ))}
           </div>
         </div>
@@ -229,9 +222,12 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
 
     default:
       return (
-        <pre className="max-h-64 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] text-foreground">
-          {content}
-        </pre>
+        <div className="relative group/code">
+          <CopyButton text={content} />
+          <pre className="max-h-64 overflow-auto rounded-md bg-code-bg px-4 py-3 font-mono text-[13px] text-foreground">
+            {content}
+          </pre>
+        </div>
       );
   }
 }

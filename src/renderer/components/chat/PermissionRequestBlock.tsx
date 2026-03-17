@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { getToolConfig } from "~/lib/chat-tools";
-import { cn, truncate } from "~/lib/utils";
+import { cn } from "~/lib/utils";
 import type { PermissionRequest } from "../../../shared/types";
 
 interface PermissionRequestBlockProps {
@@ -61,7 +61,7 @@ export function PermissionRequestBlock({
   const details = formatInputDetails(request.toolInput);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-2">
+    <div className="mx-auto max-w-6xl px-6 py-2">
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="flex items-center gap-3 border-b border-border/50 px-4 py-3">
           <span
@@ -76,7 +76,7 @@ export function PermissionRequestBlock({
           </span>
           {summary && (
             <span className="min-w-0 flex-1 truncate font-mono text-sm text-muted-foreground">
-              {truncate(summary, 80)}
+              {summary}
             </span>
           )}
         </div>

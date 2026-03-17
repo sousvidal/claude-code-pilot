@@ -1,17 +1,16 @@
 import { create } from "zustand";
 
 interface UIState {
-  leftSidebarCollapsed: boolean;
-  rightSidebarCollapsed: boolean;
-  toggleLeftSidebar: () => void;
-  toggleRightSidebar: () => void;
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  leftSidebarCollapsed: false,
-  rightSidebarCollapsed: false,
-  toggleLeftSidebar: () =>
-    set((state) => ({ leftSidebarCollapsed: !state.leftSidebarCollapsed })),
-  toggleRightSidebar: () =>
-    set((state) => ({ rightSidebarCollapsed: !state.rightSidebarCollapsed })),
+  sidebarCollapsed: false,
+
+  toggleSidebar: () =>
+    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 }));

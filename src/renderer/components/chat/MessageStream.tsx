@@ -3,7 +3,8 @@ import { ChevronDown } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { parseTurns } from "~/lib/parse-turns";
+import { parseTurnsIncremental } from "~/lib/parse-turns";
+import type { Turn } from "../../../shared/types";
 import { TurnBlock } from "./TurnBlock";
 
 interface MessageStreamProps {
@@ -18,7 +19,16 @@ export function MessageStream({ messages, isLive }: MessageStreamProps) {
     ),
     [messages],
   );
-  const turns = useMemo(() => parseTurns(parentMessages), [parentMessages]);
+  const prevRef = useRef<{ turns: Turn[]; count: number }>({ turns: [], count: 0 });
+  const turns = useMemo(() => {
+    const result = parseTurnsIncremental(
+      prevRef.current.turns,
+      prevRef.current.count,
+      parentMessages,
+    );
+    prevRef.current = { turns: result, count: parentMessages.length };
+    return result;
+  }, [parentMessages]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -53,7 +63,7 @@ export function MessageStream({ messages, isLive }: MessageStreamProps) {
   return (
     <div className="relative flex-1 overflow-hidden">
       <ScrollArea className="h-full" ref={scrollAreaRef}>
-        <div className="mx-auto max-w-3xl px-6 py-4">
+        <div className="mx-auto max-w-6xl px-6 py-4">
           {turns.map((turn, i) => (
             <TurnBlock
               key={turn.number}
