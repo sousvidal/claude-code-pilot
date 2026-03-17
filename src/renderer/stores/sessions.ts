@@ -6,6 +6,7 @@ interface SessionsState {
   activeProjectPath: string | null;
   scrollPositions: Record<string, number>;
   pendingNewSession: { projectPath: string; firstPrompt: string; sessionId?: string } | null;
+  pinnedSessionIds: string[];
 
   openProject: (path: string) => void;
   closeProject: (path: string) => void;
@@ -15,6 +16,8 @@ interface SessionsState {
   setScrollPosition: (sessionId: string, position: number) => void;
   setPendingNewSession: (data: { projectPath: string; firstPrompt: string; sessionId?: string }) => void;
   clearPendingNewSession: () => void;
+  pinSession: (sessionId: string) => void;
+  unpinSession: (sessionId: string) => void;
 }
 
 export const useSessionsStore = create<SessionsState>((set, get) => ({
@@ -23,6 +26,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
   activeProjectPath: null,
   scrollPositions: {},
   pendingNewSession: null,
+  pinnedSessionIds: [],
 
   openProject: (path) => {
     const { openProjects } = get();
@@ -76,4 +80,16 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   setPendingNewSession: (data) => set({ pendingNewSession: data }),
   clearPendingNewSession: () => set({ pendingNewSession: null }),
+
+  pinSession: (sessionId) =>
+    set((state) => ({
+      pinnedSessionIds: state.pinnedSessionIds.includes(sessionId)
+        ? state.pinnedSessionIds
+        : [...state.pinnedSessionIds, sessionId],
+    })),
+
+  unpinSession: (sessionId) =>
+    set((state) => ({
+      pinnedSessionIds: state.pinnedSessionIds.filter((id) => id !== sessionId),
+    })),
 }));

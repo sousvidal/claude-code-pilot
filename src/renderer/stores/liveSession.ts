@@ -9,6 +9,14 @@ export interface SessionRunState {
   permissionQueue: PermissionRequest[];
 }
 
+export interface LastSessionResult {
+  costUsd?: number;
+  durationMs?: number;
+  inputTokens: number;
+  outputTokens: number;
+  numTurns?: number;
+}
+
 interface LiveSessionState {
   // Per-run state keyed by correlationId
   runningSessions: Map<string, SessionRunState>;
@@ -19,6 +27,8 @@ interface LiveSessionState {
   // UI preferences
   currentModel: string;
   error: string | null;
+  // Stats from the most recently completed session run
+  lastResult: LastSessionResult | null;
 
   startRun: (correlationId: string) => void;
   endRun: (correlationId: string) => void;
@@ -44,6 +54,7 @@ export const useLiveSessionStore = create<LiveSessionState>((set) => ({
   unseenSessionIds: [],
   currentModel: "sonnet",
   error: null,
+  lastResult: null,
 
   startRun: (correlationId) =>
     set((state) => {
@@ -59,10 +70,29 @@ export const useLiveSessionStore = create<LiveSessionState>((set) => ({
 
   endRun: (correlationId) =>
     set((state) => {
-      if (!state.runningSessions.has(correlationId)) return state;
+      const run = state.runningSessions.get(correlationId);
+      if (!run) return state;
+
+      // Extract stats from the result message before clearing
+      let lastResult = state.lastResult;
+      for (const msg of run.messages) {
+        const m = msg as Record<string, unknown>;
+        if (m.type === "result") {
+          const usage = m.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+          lastResult = {
+            costUsd: typeof m.cost_usd === "number" ? m.cost_usd : undefined,
+            durationMs: typeof m.duration_ms === "number" ? m.duration_ms : undefined,
+            numTurns: typeof m.num_turns === "number" ? m.num_turns : undefined,
+            inputTokens: usage?.input_tokens ?? 0,
+            outputTokens: usage?.output_tokens ?? 0,
+          };
+          break;
+        }
+      }
+
       const next = new Map(state.runningSessions);
       next.delete(correlationId);
-      return { runningSessions: next };
+      return { runningSessions: next, lastResult };
     }),
 
   setRunSessionId: (correlationId, sessionId) =>

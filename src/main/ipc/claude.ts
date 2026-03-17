@@ -1,5 +1,6 @@
 import { dialog, ipcMain } from "electron";
 import { claudeService } from "../services/claude.service";
+import { getUsageData } from "../services/usage.service";
 
 export function registerClaudeHandlers(): void {
   ipcMain.handle("dialog:openDirectory", async () => {
@@ -25,4 +26,10 @@ export function registerClaudeHandlers(): void {
   );
 
   ipcMain.handle("claude:models", () => claudeService.getModels());
+
+  ipcMain.handle("claude:authStatus", () => claudeService.getAuthStatus());
+
+  ipcMain.handle("claude:usageStats", () => claudeService.getUsageStats());
+
+  ipcMain.handle("claude:usageData", () => getUsageData());
 }

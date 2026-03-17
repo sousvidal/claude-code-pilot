@@ -7,8 +7,6 @@ Clay is a desktop IDE for Claude Code. It wraps the `claude` CLI with a rich GUI
 ## Session Management
 
 
-**Session summary display** — If the Claude session has a generated summary it is shown as the session title. Otherwise the first user prompt is used.
-
 **Relative timestamps** — Each session item shows how long ago it was last active ("2 hours ago", "yesterday") rather than an absolute date.
 
 **Active session highlight** — The currently viewed session is visually distinguished with an accent-colored left border.
@@ -18,8 +16,6 @@ Clay is a desktop IDE for Claude Code. It wraps the `claude` CLI with a rich GUI
 **Pending permission indicator** — Sessions with an unresolved tool approval request show a pulsing red dot, alerting the user to switch back and respond.
 
 **Unseen activity badge** — Sessions that received new messages while the user was viewing a different session are marked so the user knows to check them.
-
-**Git branch badge** — When a session's metadata contains git branch information it is displayed as a small badge on the session item and in the chat header.
 
 **Session resumption** — Any historical session can be resumed. Selecting it and typing a new message continues the conversation from where it left off, sending the follow-up to the running `claude` process.
 

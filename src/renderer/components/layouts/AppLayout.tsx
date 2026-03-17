@@ -10,6 +10,7 @@ import {
 } from "~/components/ui/resizable";
 import { Button } from "~/components/ui/button";
 import { ProjectTabBar } from "./ProjectTabBar";
+import { StatusBar } from "./StatusBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
 
@@ -41,6 +42,44 @@ export function AppLayout() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
+
+  useEffect(() => {
+    let mounted = true;
+    let initialized = false;
+
+    const unsubSessions = useSessionsStore.subscribe((state) => {
+      if (!initialized) return;
+      void window.api.app.setState({
+        openProjects: state.openProjects,
+        activeProjectPath: state.activeProjectPath,
+        activeSessionId: state.activeSessionId,
+        pinnedSessionIds: state.pinnedSessionIds,
+      });
+    });
+
+    const unsubUI = useUIStore.subscribe((state) => {
+      if (!initialized) return;
+      void window.api.app.setState({ sidebarCollapsed: state.sidebarCollapsed });
+    });
+
+    void window.api.app.getState().then((state) => {
+      if (!mounted) return;
+      useSessionsStore.setState({
+        openProjects: state.openProjects,
+        activeProjectPath: state.activeProjectPath,
+        activeSessionId: state.activeSessionId,
+        pinnedSessionIds: state.pinnedSessionIds ?? [],
+      });
+      useUIStore.setState({ sidebarCollapsed: state.sidebarCollapsed });
+      initialized = true;
+    });
+
+    return () => {
+      mounted = false;
+      unsubSessions();
+      unsubUI();
+    };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -105,6 +144,8 @@ export function AppLayout() {
       ) : (
         <EmptyView />
       )}
+
+      <StatusBar />
     </div>
   );
 }

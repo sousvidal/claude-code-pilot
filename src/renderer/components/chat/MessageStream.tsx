@@ -62,7 +62,7 @@ export function MessageStream({ messages, isLive }: MessageStreamProps) {
 
   return (
     <div className="relative flex-1 overflow-hidden">
-      <ScrollArea className="h-full" ref={scrollAreaRef}>
+      <ScrollArea className="h-full [&>[data-radix-scroll-area-viewport]>div]:w-full" ref={scrollAreaRef}>
         <div className="mx-auto max-w-6xl px-6 py-4">
           {turns.map((turn, i) => (
             <TurnBlock

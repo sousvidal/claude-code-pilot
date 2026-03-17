@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Plus, FolderOpen, Loader2 } from "lucide-react";
+import { Search, Plus, FolderOpen, Loader2, Pin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useSessionsStore } from "~/stores/sessions";
@@ -27,6 +27,7 @@ export function SessionBrowser() {
   const clearActiveSession = useSessionsStore((s) => s.clearActiveSession);
   const openProject = useSessionsStore((s) => s.openProject);
   const pendingNewSession = useSessionsStore((s) => s.pendingNewSession);
+  const pinnedSessionIds = useSessionsStore((s) => s.pinnedSessionIds);
 
   const handleNewChat = () => {
     clearActiveSession();
@@ -58,6 +59,16 @@ export function SessionBrowser() {
         s.firstPrompt?.toLowerCase().includes(query),
     );
   }, [projectSessions, searchQuery]);
+
+  const pinnedSessions = useMemo(
+    () => filteredSessions.filter((s) => pinnedSessionIds.includes(s.sessionId)),
+    [filteredSessions, pinnedSessionIds],
+  );
+
+  const unpinnedSessions = useMemo(
+    () => filteredSessions.filter((s) => !pinnedSessionIds.includes(s.sessionId)),
+    [filteredSessions, pinnedSessionIds],
+  );
 
   return (
     <div className="flex h-full flex-col bg-card">
@@ -123,14 +134,37 @@ export function SessionBrowser() {
                   {searchQuery ? "No matching sessions" : "No sessions yet"}
                 </p>
               ) : (
-                filteredSessions.map((session) => (
-                  <SessionItem
-                    key={session.sessionId}
-                    session={session}
-                    projectPath={activeProjectPath}
-                    isActive={session.sessionId === activeSessionId}
-                  />
-                ))
+                <>
+                  {pinnedSessions.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-1.5 px-1 pt-1 pb-0.5">
+                        <Pin className="h-3 w-3 text-muted-foreground/60" />
+                        <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
+                          Pinned
+                        </span>
+                      </div>
+                      {pinnedSessions.map((session) => (
+                        <SessionItem
+                          key={session.sessionId}
+                          session={session}
+                          projectPath={activeProjectPath}
+                          isActive={session.sessionId === activeSessionId}
+                        />
+                      ))}
+                      {unpinnedSessions.length > 0 && (
+                        <div className="mx-1 my-1 border-t border-border" />
+                      )}
+                    </>
+                  )}
+                  {unpinnedSessions.map((session) => (
+                    <SessionItem
+                      key={session.sessionId}
+                      session={session}
+                      projectPath={activeProjectPath}
+                      isActive={session.sessionId === activeSessionId}
+                    />
+                  ))}
+                </>
               )}
             </div>
           )}

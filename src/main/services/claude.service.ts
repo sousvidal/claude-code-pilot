@@ -1,7 +1,7 @@
-import { spawn } from "child_process";
+import { spawn, execFile } from "child_process";
 import type { ChildProcess } from "child_process";
 import { watch, type FSWatcher } from "fs";
-import { stat as fsStat, open as fsOpen, readdir } from "fs/promises";
+import { stat as fsStat, open as fsOpen, readdir, readFile } from "fs/promises";
 import { createInterface } from "readline";
 import { join } from "path";
 import { homedir } from "os";
@@ -54,26 +54,44 @@ async function findSessionJsonlPath(
   }
 }
 
+function hasToolResultBlock(content: unknown[]): boolean {
+  return content.some((b) => (b as { type?: string })?.type === "tool_result");
+}
+
 function isToolResultMessage(msg: Record<string, unknown>): boolean {
   const message = msg.message as { content?: unknown[] } | undefined;
-  if (!Array.isArray(message?.content)) return false;
-  return message.content.some(
-    (b) => (b as { type?: string })?.type === "tool_result",
-  );
+  if (Array.isArray(message?.content) && hasToolResultBlock(message.content)) return true;
+  if (Array.isArray(msg.content) && hasToolResultBlock(msg.content as unknown[])) return true;
+  return false;
+}
+
+function isUserMessage(msg: Record<string, unknown>): boolean {
+  return msg.type === "user" || msg.role === "user";
 }
 
 function startJsonlTailer(
   filePath: string,
   onToolResult: (parsed: Record<string, unknown>) => void,
 ): () => void {
-  let offset = 0;
+  // Seed offset to the current file size so we only tail new bytes written
+  // after the tailer starts — avoids replaying the entire session history.
+  let offset = -1;
   let remainder = "";
   let closed = false;
+  let flushing = false;
 
   async function flush() {
-    if (closed) return;
+    if (closed || flushing) return;
+    flushing = true;
     try {
       const s = await fsStat(filePath);
+
+      // First call: initialise offset to EOF so historical lines are skipped.
+      if (offset === -1) {
+        offset = s.size;
+        return;
+      }
+
       if (s.size <= offset) return;
 
       const fh = await fsOpen(filePath, "r");
@@ -90,7 +108,7 @@ function startJsonlTailer(
           if (!line.trim()) continue;
           try {
             const parsed = JSON.parse(line) as Record<string, unknown>;
-            if (parsed.type === "user" && isToolResultMessage(parsed)) {
+            if (isUserMessage(parsed) && isToolResultMessage(parsed)) {
               onToolResult(parsed);
             }
           } catch {
@@ -102,27 +120,26 @@ function startJsonlTailer(
       }
     } catch {
       // file temporarily unavailable during writes
+    } finally {
+      flushing = false;
     }
   }
-
-  fsStat(filePath)
-    .then((s) => {
-      offset = s.size;
-    })
-    .catch(() => {});
 
   let watcher: FSWatcher | null = null;
   try {
     watcher = watch(filePath, () => {
-      if (!closed) flush();
+      if (!closed) void flush();
     });
     watcher.on("error", () => {});
   } catch {
     // file may not exist yet
   }
 
+  // Trigger the first flush immediately to record the initial EOF offset.
+  void flush();
+
   const poll = setInterval(() => {
-    if (!closed) flush();
+    if (!closed) void flush();
   }, 500);
 
   return () => {
@@ -202,15 +219,25 @@ async function runOneTurn(
         typeof parsed.session_id === "string"
       ) {
         ctx.sessionId = parsed.session_id;
-        findSessionJsonlPath(parsed.session_id, cwd).then((fp) => {
-          if (!fp || ctx.stopTailing) return;
-          ctx.stopTailing = startJsonlTailer(fp, (msg) => {
-            mainWindow.webContents.send("claude:message", {
-              ...msg,
-              correlationId,
-            });
-          });
-        });
+        (async () => {
+          const delayMs = 500;
+          while (activeSessions.has(correlationId)) {
+            if (ctx.stopTailing) return;
+            const fp = await findSessionJsonlPath(parsed.session_id as string, cwd);
+            if (fp) {
+              if (!activeSessions.has(correlationId) || ctx.stopTailing) return;
+              ctx.stopTailing = startJsonlTailer(fp, (msg) => {
+                mainWindow.webContents.send("claude:message", {
+                  ...msg,
+                  correlationId,
+                });
+              });
+              return;
+            }
+            if (!activeSessions.has(correlationId)) return;
+            await new Promise<void>((r) => setTimeout(r, delayMs));
+          }
+        })();
       }
       mainWindow.webContents.send("claude:message", { ...parsed, correlationId });
     } catch {
@@ -307,5 +334,73 @@ export const claudeService = {
 
   async getModels(): Promise<unknown[]> {
     return [];
+  },
+
+  async getUsageStats(): Promise<{
+    totalSessions: number;
+    totalMessages: number;
+    firstSessionDate: string | null;
+    dailyActivity: Array<{ date: string; messageCount: number; sessionCount: number; toolCallCount: number }>;
+    modelUsage: Record<string, { inputTokens: number; outputTokens: number; costUSD: number }>;
+  }> {
+    const statsPath = join(homedir(), ".claude", "stats-cache.json");
+    try {
+      const raw = await readFile(statsPath, "utf-8");
+      const data = JSON.parse(raw) as Record<string, unknown>;
+      return {
+        totalSessions: typeof data.totalSessions === "number" ? data.totalSessions : 0,
+        totalMessages: typeof data.totalMessages === "number" ? data.totalMessages : 0,
+        firstSessionDate: typeof data.firstSessionDate === "string" ? data.firstSessionDate : null,
+        dailyActivity: Array.isArray(data.dailyActivity)
+          ? (data.dailyActivity as Array<Record<string, unknown>>).map((d) => ({
+              date: String(d.date ?? ""),
+              messageCount: typeof d.messageCount === "number" ? d.messageCount : 0,
+              sessionCount: typeof d.sessionCount === "number" ? d.sessionCount : 0,
+              toolCallCount: typeof d.toolCallCount === "number" ? d.toolCallCount : 0,
+            }))
+          : [],
+        modelUsage: typeof data.modelUsage === "object" && data.modelUsage !== null
+          ? Object.fromEntries(
+              Object.entries(data.modelUsage as Record<string, Record<string, unknown>>).map(([model, u]) => [
+                model,
+                {
+                  inputTokens: typeof u.inputTokens === "number" ? u.inputTokens : 0,
+                  outputTokens: typeof u.outputTokens === "number" ? u.outputTokens : 0,
+                  costUSD: typeof u.costUSD === "number" ? u.costUSD : 0,
+                },
+              ]),
+            )
+          : {},
+      };
+    } catch {
+      return { totalSessions: 0, totalMessages: 0, firstSessionDate: null, dailyActivity: [], modelUsage: {} };
+    }
+  },
+
+  getAuthStatus(): Promise<{
+    loggedIn: boolean;
+    authMethod?: string;
+    subscriptionType?: string;
+    email?: string;
+  }> {
+    return new Promise((resolve) => {
+      execFile("claude", ["auth", "status"], { timeout: 5000 }, (err, stdout) => {
+        if (err) {
+          resolve({ loggedIn: false });
+          return;
+        }
+        try {
+          const data = JSON.parse(stdout.trim()) as Record<string, unknown>;
+          resolve({
+            loggedIn: data.loggedIn === true,
+            authMethod: typeof data.authMethod === "string" ? data.authMethod : undefined,
+            subscriptionType: typeof data.subscriptionType === "string" ? data.subscriptionType : undefined,
+            email: typeof data.email === "string" ? data.email : undefined,
+          });
+        } catch {
+          resolve({ loggedIn: false });
+        }
+      });
+    });
   },
 };
