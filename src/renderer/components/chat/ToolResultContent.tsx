@@ -47,7 +47,7 @@ function stripReadContent(content: string): string {
   return content
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
     .split("\n")
-    .map((line) => line.replace(/^\s*\d+\|/, ""))
+    .map((line) => line.replace(/^\s*\d+→/, ""))
     .join("\n")
     .trim();
 }
