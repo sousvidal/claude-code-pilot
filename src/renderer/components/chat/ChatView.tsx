@@ -85,7 +85,13 @@ export function ChatView() {
       ) {
         const sessionId = message.session_id;
         setRunSessionId(correlationId, sessionId);
-        clearPendingNewSession();
+        const currentPending = useSessionsStore.getState().pendingNewSession;
+        if (currentPending) {
+          useSessionsStore.getState().setPendingNewSession({
+            ...currentPending,
+            sessionId,
+          });
+        }
         const sessionsState = useSessionsStore.getState();
         if (!sessionsState.activeSessionId) {
           sessionsState.setActiveSession(sessionId, sessionsState.activeProjectPath ?? "");
@@ -98,6 +104,7 @@ export function ChatView() {
 
     const unsubDone = window.api.claude.onDone(({ correlationId, sessionId }) => {
       endRun(correlationId);
+      clearPendingNewSession();
       if (sessionId) {
         clearPermissionsForSession(sessionId);
         const { activeSessionId: currentActiveId } = useSessionsStore.getState();

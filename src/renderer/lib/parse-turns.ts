@@ -175,6 +175,85 @@ function collectToolResults(messages: unknown[]): Map<string, ToolResult> {
   return toolResults;
 }
 
+export function parseTurnsIncremental(
+  existingTurns: Turn[],
+  prevMessageCount: number,
+  allMessages: unknown[],
+): Turn[] {
+  if (allMessages.length < prevMessageCount || prevMessageCount === 0) {
+    return parseTurns(allMessages);
+  }
+
+  if (allMessages.length === prevMessageCount) {
+    return existingTurns;
+  }
+
+  const toolResults = collectToolResults(allMessages);
+
+  if (existingTurns.length === 0) {
+    return parseTurns(allMessages);
+  }
+
+  let rebuildFrom = prevMessageCount;
+  for (let i = prevMessageCount - 1; i >= 0; i--) {
+    const msg = allMessages[i] as SdkMessage;
+    if (msg?.type === "user" && !isToolResultUserMessage(msg)) {
+      rebuildFrom = i;
+      break;
+    }
+  }
+
+  const keptTurns = existingTurns.slice(0, -1);
+  let turnIndex = keptTurns.length;
+  const tailTurns: Turn[] = [];
+
+  for (let i = rebuildFrom; i < allMessages.length; i++) {
+    const msg = allMessages[i] as SdkMessage;
+    if (msg?.type === "user" && !isToolResultUserMessage(msg)) {
+      const text = extractUserText(msg);
+      const userMessage: TurnUserMessage = {
+        text,
+        timestamp: msg.timestamp ?? new Date().toISOString(),
+      };
+
+      const assistantBlocks: AssistantBlock[] = [];
+      let j = i + 1;
+      while (j < allMessages.length) {
+        const next = allMessages[j] as SdkMessage;
+        if (next?.type === "assistant") {
+          const blocks = extractAssistantBlocks(next);
+          for (const block of blocks) {
+            if (block.type === "tool_use") {
+              const result = toolResults.get(block.id);
+              assistantBlocks.push({ ...block, result });
+            } else {
+              assistantBlocks.push(block);
+            }
+          }
+          j++;
+        } else if (next?.type === "user" && isToolResultUserMessage(next)) {
+          j++;
+        } else if (next?.type === "user") {
+          break;
+        } else {
+          j++;
+        }
+      }
+
+      turnIndex++;
+      tailTurns.push({
+        number: turnIndex,
+        timestamp: userMessage.timestamp,
+        userMessage,
+        assistantBlocks,
+      });
+      i = j - 1;
+    }
+  }
+
+  return [...keptTurns, ...tailTurns];
+}
+
 export function parseTurns(messages: unknown[]): Turn[] {
   const turns: Turn[] = [];
   let turnIndex = 0;

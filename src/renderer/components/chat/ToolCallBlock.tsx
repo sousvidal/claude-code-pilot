@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   ChevronRight,
   CircleCheck,
@@ -119,6 +120,11 @@ export function ToolCallBlock({
   const Icon = config.icon;
   const summary = getSummary(toolName, input);
   const running = isRunning ?? (isLive && !result);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (running) setOpen(true);
+  }, [running]);
 
   const statusIcon = running ? (
     <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
@@ -129,7 +135,7 @@ export function ToolCallBlock({
   );
 
   return (
-    <Collapsible defaultOpen={false} className="group">
+    <Collapsible open={open} onOpenChange={setOpen} className="group">
       <CollapsibleTrigger className="flex w-full items-center gap-3 rounded-lg border border-border/50 bg-card/50 px-3 py-2 text-left transition-colors hover:bg-muted/30">
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
         <span

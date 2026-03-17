@@ -1,11 +1,17 @@
 import { spawn } from "child_process";
 import type { ChildProcess } from "child_process";
+import { watch, type FSWatcher } from "fs";
+import { stat as fsStat, open as fsOpen, readdir } from "fs/promises";
 import { createInterface } from "readline";
+import { join } from "path";
+import { homedir } from "os";
 import { getMainWindow } from "../index";
 import { getApprovalServerPort } from "./approval.service";
 import { logger } from "../lib/logger";
 
 const log = logger.child({ service: "claude" });
+
+const PROJECTS_DIR = join(homedir(), ".claude", "projects");
 
 interface ProcessContext {
   process: ChildProcess;
@@ -13,10 +19,118 @@ interface ProcessContext {
   cwd: string;
   model: string;
   effort: string;
+  stopTailing?: () => void;
 }
 
 // Active processes keyed by correlationId
 const activeSessions = new Map<string, ProcessContext>();
+
+async function findSessionJsonlPath(
+  sessionId: string,
+  cwd: string,
+): Promise<string | null> {
+  const slug = cwd.replace(/[/_]/g, "-");
+  const candidate = join(PROJECTS_DIR, slug, `${sessionId}.jsonl`);
+  try {
+    await fsStat(candidate);
+    return candidate;
+  } catch {
+    try {
+      const entries = await readdir(PROJECTS_DIR, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const p = join(PROJECTS_DIR, entry.name, `${sessionId}.jsonl`);
+        try {
+          await fsStat(p);
+          return p;
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      // projects dir not readable
+    }
+    return null;
+  }
+}
+
+function isToolResultMessage(msg: Record<string, unknown>): boolean {
+  const message = msg.message as { content?: unknown[] } | undefined;
+  if (!Array.isArray(message?.content)) return false;
+  return message.content.some(
+    (b) => (b as { type?: string })?.type === "tool_result",
+  );
+}
+
+function startJsonlTailer(
+  filePath: string,
+  onToolResult: (parsed: Record<string, unknown>) => void,
+): () => void {
+  let offset = 0;
+  let remainder = "";
+  let closed = false;
+
+  async function flush() {
+    if (closed) return;
+    try {
+      const s = await fsStat(filePath);
+      if (s.size <= offset) return;
+
+      const fh = await fsOpen(filePath, "r");
+      try {
+        const buf = Buffer.alloc(s.size - offset);
+        const { bytesRead } = await fh.read(buf, 0, buf.length, offset);
+        offset = s.size;
+
+        const raw = remainder + buf.subarray(0, bytesRead).toString("utf-8");
+        const parts = raw.split("\n");
+        remainder = parts.pop() ?? "";
+
+        for (const line of parts) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line) as Record<string, unknown>;
+            if (parsed.type === "user" && isToolResultMessage(parsed)) {
+              onToolResult(parsed);
+            }
+          } catch {
+            // skip malformed lines
+          }
+        }
+      } finally {
+        await fh.close();
+      }
+    } catch {
+      // file temporarily unavailable during writes
+    }
+  }
+
+  fsStat(filePath)
+    .then((s) => {
+      offset = s.size;
+    })
+    .catch(() => {});
+
+  let watcher: FSWatcher | null = null;
+  try {
+    watcher = watch(filePath, () => {
+      if (!closed) flush();
+    });
+    watcher.on("error", () => {});
+  } catch {
+    // file may not exist yet
+  }
+
+  const poll = setInterval(() => {
+    if (!closed) flush();
+  }, 500);
+
+  return () => {
+    closed = true;
+    watcher?.close();
+    clearInterval(poll);
+  };
+}
 
 async function runOneTurn(
   correlationId: string,
@@ -88,6 +202,15 @@ async function runOneTurn(
         typeof parsed.session_id === "string"
       ) {
         ctx.sessionId = parsed.session_id;
+        findSessionJsonlPath(parsed.session_id, cwd).then((fp) => {
+          if (!fp || ctx.stopTailing) return;
+          ctx.stopTailing = startJsonlTailer(fp, (msg) => {
+            mainWindow.webContents.send("claude:message", {
+              ...msg,
+              correlationId,
+            });
+          });
+        });
       }
       mainWindow.webContents.send("claude:message", { ...parsed, correlationId });
     } catch {
@@ -104,6 +227,7 @@ async function runOneTurn(
 
   return new Promise<void>((resolve, reject) => {
     child.on("close", (code) => {
+      ctx.stopTailing?.();
       const sessionId = ctx.sessionId;
       activeSessions.delete(correlationId);
       rl.close();
@@ -119,6 +243,7 @@ async function runOneTurn(
     });
 
     child.on("error", (err: NodeJS.ErrnoException) => {
+      ctx.stopTailing?.();
       activeSessions.delete(correlationId);
       rl.close();
       const message =
