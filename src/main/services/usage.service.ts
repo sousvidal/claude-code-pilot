@@ -3,9 +3,14 @@ import { logger } from "../lib/logger";
 
 const log = logger.child({ service: "usage" });
 
+// Public OAuth client ID from the @anthropic-ai/claude-code npm package.
+// This is not a secret — it identifies the native app to Anthropic's auth
+// server and is already embedded in the published CLI binary.
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const BETA_HEADER = "oauth-2025-04-20";
 const USER_AGENT = "claude-code/0.0.0";
+// Cap keychain output to prevent DoS from unexpectedly large payloads.
+const KEYCHAIN_MAX_BYTES = 64 * 1024; // 64 KB
 
 interface OAuthCredentials {
   accessToken: string;
@@ -51,11 +56,13 @@ export interface UsageData {
 }
 
 function readKeychainCredentials(): Promise<OAuthCredentials | null> {
+  if (process.platform !== "darwin") return Promise.resolve(null);
+
   return new Promise((resolve) => {
     execFile(
       "/usr/bin/security",
       ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
-      { timeout: 5000 },
+      { timeout: 5000, maxBuffer: KEYCHAIN_MAX_BYTES },
       (err, stdout) => {
         if (err) {
           log.debug({ err: err.message }, "keychain read failed");
