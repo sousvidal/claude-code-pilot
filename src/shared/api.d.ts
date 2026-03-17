@@ -1,7 +1,18 @@
 import type { AutoApprovedEvent, FileTreeNode, PermissionRequest } from "./types";
 
+interface PersistedAppState {
+  openProjects: string[];
+  activeProjectPath: string | null;
+  activeSessionId: string | null;
+  sidebarCollapsed: boolean;
+}
+
 interface Window {
   api: {
+    app: {
+      getState: () => Promise<PersistedAppState>;
+      setState: (partial: Partial<PersistedAppState>) => Promise<void>;
+    };
     sessions: {
       list: (dir?: string) => Promise<unknown[]>;
       getMessages: (sessionId: string, dir?: string) => Promise<unknown[]>;

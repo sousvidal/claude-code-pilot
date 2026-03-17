@@ -43,6 +43,39 @@ export function AppLayout() {
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
 
   useEffect(() => {
+    let initialized = false;
+
+    const unsubSessions = useSessionsStore.subscribe((state) => {
+      if (!initialized) return;
+      void window.api.app.setState({
+        openProjects: state.openProjects,
+        activeProjectPath: state.activeProjectPath,
+        activeSessionId: state.activeSessionId,
+      });
+    });
+
+    const unsubUI = useUIStore.subscribe((state) => {
+      if (!initialized) return;
+      void window.api.app.setState({ sidebarCollapsed: state.sidebarCollapsed });
+    });
+
+    void window.api.app.getState().then((state) => {
+      useSessionsStore.setState({
+        openProjects: state.openProjects,
+        activeProjectPath: state.activeProjectPath,
+        activeSessionId: state.activeSessionId,
+      });
+      useUIStore.setState({ sidebarCollapsed: state.sidebarCollapsed });
+      initialized = true;
+    });
+
+    return () => {
+      unsubSessions();
+      unsubUI();
+    };
+  }, []);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       const isInputFocused =

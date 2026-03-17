@@ -49,6 +49,11 @@ contextBridge.exposeInMainWorld("api", {
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url),
   },
+  app: {
+    getState: () => ipcRenderer.invoke("app:getState"),
+    setState: (partial: Record<string, unknown>) =>
+      ipcRenderer.invoke("app:setState", partial),
+  },
   permission: {
     onRequest: (callback: (request: PermissionRequest) => void) => {
       const handler = (_event: IpcRendererEvent, request: PermissionRequest) =>
