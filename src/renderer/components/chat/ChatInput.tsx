@@ -19,12 +19,16 @@ const MODELS = ["sonnet", "opus", "haiku"];
 const MAX_TEXTAREA_HEIGHT = 144; // 6 lines × 24px line-height
 
 /** Returns the slash-command token at the cursor, or null if not in one. */
+/** Returns the index of the start of the last whitespace-delimited word in `str`. */
+function getWordStart(str: string): number {
+  const match = str.search(/\S+$/);
+  return match === -1 ? str.length : match;
+}
+
 function getSlashToken(value: string, cursorPos: number): string | null {
   const before = value.slice(0, cursorPos);
-  // Find the start of the current "word" (split on whitespace)
-  const wordStart = before.lastIndexOf(" ") + 1;
-  const word = before.slice(wordStart);
-  if (word.startsWith("/")) return word.slice(1); // return what comes after "/"
+  const word = before.slice(getWordStart(before));
+  if (word.startsWith("/")) return word.slice(1);
   return null;
 }
 
@@ -53,7 +57,7 @@ export function ChatInput() {
   const { data: allCommands = [] } = useQuery({
     queryKey: ["commands", activeProjectPath],
     queryFn: () => listCommands(activeProjectPath ?? undefined),
-    staleTime: Infinity,
+    staleTime: 60_000,
   });
 
   const filteredCommands = useMemo(
@@ -72,6 +76,10 @@ export function ChatInput() {
 
   const isAutocompleteOpen = slashToken !== null && filteredCommands.length > 0;
 
+  useEffect(() => {
+    setSelectedIndex((i) => Math.min(i, Math.max(0, filteredCommands.length - 1)));
+  }, [filteredCommands.length]);
+
   const applyCommand = useCallback(
     (name: string) => {
       const el = textareaRef.current;
@@ -79,7 +87,7 @@ export function ChatInput() {
       const cursorPos = el.selectionStart ?? input.length;
       const before = input.slice(0, cursorPos);
       const after = input.slice(cursorPos);
-      const wordStart = before.lastIndexOf(" ") + 1;
+      const wordStart = getWordStart(before);
       const newValue = before.slice(0, wordStart) + `/${name} ` + after;
       setInput(newValue);
       setSlashToken(null);
@@ -170,7 +178,8 @@ export function ChatInput() {
         }
         if (e.key === "Enter" || e.key === "Tab") {
           e.preventDefault();
-          applyCommand(filteredCommands[selectedIndex].name);
+          const cmd = filteredCommands[selectedIndex];
+          if (cmd) applyCommand(cmd.name);
           return;
         }
         if (e.key === "Escape") {
@@ -187,6 +196,11 @@ export function ChatInput() {
     },
     [isAutocompleteOpen, filteredCommands, selectedIndex, applyCommand, handleSend],
   );
+
+  const handleSelect = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    setSlashToken(getSlashToken(el.value, el.selectionStart ?? el.value.length));
+  }, []);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -243,6 +257,7 @@ export function ChatInput() {
             ref={textareaRef}
             value={input}
             onChange={handleInputChange}
+            onSelect={handleSelect}
             onKeyDown={handleKeyDown}
             disabled={isRunning}
             placeholder={isRunning ? "Claude is thinking..." : "Type your message..."}
