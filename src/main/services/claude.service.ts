@@ -78,9 +78,11 @@ function startJsonlTailer(
   let offset = -1;
   let remainder = "";
   let closed = false;
+  let flushing = false;
 
   async function flush() {
-    if (closed) return;
+    if (closed || flushing) return;
+    flushing = true;
     try {
       const s = await fsStat(filePath);
 
@@ -118,6 +120,8 @@ function startJsonlTailer(
       }
     } catch {
       // file temporarily unavailable during writes
+    } finally {
+      flushing = false;
     }
   }
 
