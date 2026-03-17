@@ -1,4 +1,4 @@
-import { readFile, readdir, stat, open } from "fs/promises";
+import { readFile, readdir, stat, open, unlink } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 import { logger } from "../lib/logger";
@@ -154,40 +154,52 @@ export const sessionService = {
     return results;
   },
 
-  async getMessages(sessionId: string, dir?: string): Promise<unknown[]> {
-    log.info({ sessionId, dir }, "loading messages for session");
-
-    let jsonlPath: string | undefined;
-
+  async findSessionPath(sessionId: string, dir?: string): Promise<string | undefined> {
     if (dir) {
       const projectSlug = dir.replace(/[/_]/g, "-");
       const candidate = join(PROJECTS_DIR, projectSlug, `${sessionId}.jsonl`);
       try {
         await stat(candidate);
-        jsonlPath = candidate;
+        return candidate;
       } catch {
         // fall through to search
       }
     }
 
-    if (!jsonlPath) {
-      try {
-        const projectDirs = await readdir(PROJECTS_DIR, { withFileTypes: true });
-        for (const entry of projectDirs) {
-          if (!entry.isDirectory()) continue;
-          const candidate = join(PROJECTS_DIR, entry.name, `${sessionId}.jsonl`);
-          try {
-            await stat(candidate);
-            jsonlPath = candidate;
-            break;
-          } catch {
-            // not here, keep searching
-          }
+    try {
+      const projectDirs = await readdir(PROJECTS_DIR, { withFileTypes: true });
+      for (const entry of projectDirs) {
+        if (!entry.isDirectory()) continue;
+        const candidate = join(PROJECTS_DIR, entry.name, `${sessionId}.jsonl`);
+        try {
+          await stat(candidate);
+          return candidate;
+        } catch {
+          // not here, keep searching
         }
-      } catch {
-        // projects dir not readable
       }
+    } catch {
+      // projects dir not readable
     }
+
+    return undefined;
+  },
+
+  async deleteSession(sessionId: string, dir?: string): Promise<void> {
+    log.info({ sessionId, dir }, "deleting session");
+    const jsonlPath = await sessionService.findSessionPath(sessionId, dir);
+    if (!jsonlPath) {
+      log.warn({ sessionId }, "could not find session JSONL file to delete");
+      throw new Error(`Session file not found for sessionId: ${sessionId}`);
+    }
+    await unlink(jsonlPath);
+    log.info({ sessionId, jsonlPath }, "session deleted");
+  },
+
+  async getMessages(sessionId: string, dir?: string): Promise<unknown[]> {
+    log.info({ sessionId, dir }, "loading messages for session");
+
+    const jsonlPath = await sessionService.findSessionPath(sessionId, dir);
 
     if (!jsonlPath) {
       log.warn({ sessionId }, "could not find session JSONL file");

@@ -6,6 +6,7 @@ export interface PersistedAppState {
   activeProjectPath: string | null;
   activeSessionId: string | null;
   sidebarCollapsed: boolean;
+  pinnedSessionIds: string[];
 }
 
 // electron-store ships as ESM; when bundled to CJS the constructor is on .default
@@ -20,6 +21,7 @@ const store = new StoreClass<PersistedAppState>({
     activeProjectPath: null,
     activeSessionId: null,
     sidebarCollapsed: false,
+    pinnedSessionIds: [],
   },
 });
 
@@ -39,6 +41,7 @@ export function getAppState(): PersistedAppState {
     activeSessionId:
       activeProjectPath === raw.activeProjectPath ? raw.activeSessionId : null,
     sidebarCollapsed: raw.sidebarCollapsed,
+    pinnedSessionIds: raw.pinnedSessionIds ?? [],
   };
 }
 

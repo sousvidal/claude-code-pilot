@@ -65,11 +65,13 @@ export function ChatView() {
   const {
     data: historyMessages,
     isLoading: isLoadingHistory,
-    isFetching: isFetchingHistory,
   } = useQuery({
     queryKey: ["sessionMessages", activeSessionId],
     queryFn: () => getMessages(activeSessionId!, activeProjectPath ?? undefined),
-    enabled: Boolean(activeSessionId),
+    // Disabled while running: the cached pre-run snapshot is the right history.
+    // History and liveMessages are then disjoint — no UUID dedup needed.
+    // After claude:done the query re-enables and invalidateQueries triggers a refetch.
+    enabled: Boolean(activeSessionId) && !isRunning,
   });
 
   useEffect(() => {
@@ -188,24 +190,11 @@ export function ChatView() {
   const history = historyMessages ?? [];
   const hasLiveMessages = liveMessages.length > 0;
 
-  const messages = (() => {
-    if (!hasLiveMessages) return history;
-    if (isRunning || isFetchingHistory) {
-      const historyIds = new Set(
-        history
-          .filter((m): m is Record<string, unknown> => typeof m === "object" && m !== null)
-          .map((m) => m.uuid as string | undefined)
-          .filter(Boolean),
-      );
-      const newLiveMessages = liveMessages.filter((m) => {
-        if (typeof m !== "object" || m === null) return true;
-        const id = (m as Record<string, unknown>).uuid as string | undefined;
-        return !id || !historyIds.has(id);
-      });
-      return [...history, ...newLiveMessages];
-    }
-    return history.length > 0 ? history : liveMessages;
-  })();
+  // While running the query is disabled, so history is the stable pre-run snapshot.
+  // history and liveMessages are disjoint: just concatenate them.
+  const messages = hasLiveMessages
+    ? [...history, ...liveMessages]
+    : history.length > 0 ? history : liveMessages;
 
   return (
     <div className="flex h-full flex-col">
