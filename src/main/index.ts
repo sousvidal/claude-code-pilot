@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, nativeImage, shell } from "electron";
 import { join } from "path";
 import { execSync } from "child_process";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
@@ -18,6 +18,13 @@ try {
   // fall back to whatever PATH was inherited
 }
 
+app.setName("Clay");
+
+const iconPath =
+  process.platform === "win32"
+    ? join(__dirname, "../../resources/icon.ico")
+    : join(__dirname, "../../resources/icon.png");
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
@@ -27,6 +34,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    icon: iconPath,
     titleBarStyle: "hiddenInset",
     backgroundColor: "#111318",
     webPreferences: {
@@ -53,6 +61,13 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId("com.clay");
+
+  if (process.platform === "darwin") {
+    const dockIcon = nativeImage.createFromPath(
+      join(__dirname, "../../resources/icon.png"),
+    );
+    if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon);
+  }
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);

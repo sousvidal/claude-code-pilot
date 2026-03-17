@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLiveSessionStore } from "~/stores/liveSession";
 import { useSessionsStore } from "~/stores/sessions";
 import { useSessionsService } from "~/services/sessions.service";
+import { ClayLogo } from "~/components/ui/ClayLogo";
 import { ErrorBoundary } from "~/components/ui/error-boundary";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChatHeader } from "./ChatHeader";
@@ -173,10 +174,8 @@ export function ChatView() {
       <div className="flex h-full flex-col">
         <ChatHeader />
         <div className="flex flex-1 items-center justify-center p-8">
-          <div className="flex flex-col items-center gap-4 rounded-lg border-2 border-dashed border-border bg-card/50 px-12 py-8 text-center">
-            <div className="text-4xl font-bold text-muted-foreground/30">
-              Clay
-            </div>
+          <div className="flex flex-col items-center gap-6 text-center">
+            <ClayLogo size={96} className="opacity-80" />
             <p className="text-sm text-muted-foreground">
               Select a session or start a new chat
             </p>

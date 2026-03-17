@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { FolderOpen } from "lucide-react";
 
+import { ClayLogo } from "~/components/ui/ClayLogo";
+
 import { useUIStore } from "~/stores/ui";
 import { useSessionsStore } from "~/stores/sessions";
 import {
@@ -25,7 +27,7 @@ function EmptyView() {
   return (
     <div className="flex flex-1 items-center justify-center">
       <div className="flex flex-col items-center gap-6 text-center">
-        <div className="text-5xl font-bold text-muted-foreground/20">Clay</div>
+        <ClayLogo size={200} />
         <p className="text-sm text-muted-foreground">
           Open a project to get started
         </p>
