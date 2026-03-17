@@ -44,6 +44,7 @@ export function AppLayout() {
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
 
   useEffect(() => {
+    let mounted = true;
     let initialized = false;
 
     const unsubSessions = useSessionsStore.subscribe((state) => {
@@ -62,6 +63,7 @@ export function AppLayout() {
     });
 
     void window.api.app.getState().then((state) => {
+      if (!mounted) return;
       useSessionsStore.setState({
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
@@ -73,6 +75,7 @@ export function AppLayout() {
     });
 
     return () => {
+      mounted = false;
       unsubSessions();
       unsubUI();
     };
