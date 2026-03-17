@@ -24,6 +24,9 @@ interface Window {
     dialog: {
       openDirectory: () => Promise<string | null>;
     };
+    shell: {
+      openExternal: (url: string) => Promise<void>;
+    };
     permission: {
       onRequest: (callback: (request: PermissionRequest) => void) => () => void;
       onAutoApproved: (callback: (event: AutoApprovedEvent) => void) => () => void;

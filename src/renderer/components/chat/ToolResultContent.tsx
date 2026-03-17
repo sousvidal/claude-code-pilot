@@ -1,5 +1,4 @@
 import type { ToolResult } from "../../../shared/types";
-import { truncate } from "~/lib/utils";
 import { CopyButton } from "~/components/ui/copy-button";
 import { CodeHighlight } from "./CodeHighlight";
 import { EditDiffView } from "./EditDiffView";
@@ -178,11 +177,13 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
               {r.url && (
                 <a
                   href={r.url}
-                  className="text-xs text-accent-blue hover:underline"
-                  target="_blank"
-                  rel="noreferrer"
+                  className="text-xs text-accent-blue hover:underline cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void window.api.shell.openExternal(r.url!);
+                  }}
                 >
-                  {truncate(r.url, 60)}
+                  {r.url}
                 </a>
               )}
               {r.snippet && (

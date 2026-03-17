@@ -35,7 +35,13 @@ export function TextBlock({ text }: TextBlockProps) {
           a: ({ href, children, ...props }) => (
             <a
               href={href}
-              className="text-accent-blue hover:underline"
+              className="text-accent-blue hover:underline cursor-pointer"
+              onClick={(e) => {
+                if (href) {
+                  e.preventDefault();
+                  void window.api.shell.openExternal(href);
+                }
+              }}
               {...props}
             >
               {children}

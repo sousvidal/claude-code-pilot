@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld("api", {
   dialog: {
     openDirectory: () => ipcRenderer.invoke("dialog:openDirectory"),
   },
+  shell: {
+    openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url),
+  },
   permission: {
     onRequest: (callback: (request: PermissionRequest) => void) => {
       const handler = (_event: IpcRendererEvent, request: PermissionRequest) =>
