@@ -73,7 +73,9 @@ function startJsonlTailer(
   filePath: string,
   onToolResult: (parsed: Record<string, unknown>) => void,
 ): () => void {
-  let offset = 0;
+  // Seed offset to the current file size so we only tail new bytes written
+  // after the tailer starts — avoids replaying the entire session history.
+  let offset = -1;
   let remainder = "";
   let closed = false;
 
@@ -81,6 +83,13 @@ function startJsonlTailer(
     if (closed) return;
     try {
       const s = await fsStat(filePath);
+
+      // First call: initialise offset to EOF so historical lines are skipped.
+      if (offset === -1) {
+        offset = s.size;
+        return;
+      }
+
       if (s.size <= offset) return;
 
       const fh = await fsOpen(filePath, "r");
@@ -115,15 +124,18 @@ function startJsonlTailer(
   let watcher: FSWatcher | null = null;
   try {
     watcher = watch(filePath, () => {
-      if (!closed) flush();
+      if (!closed) void flush();
     });
     watcher.on("error", () => {});
   } catch {
     // file may not exist yet
   }
 
+  // Trigger the first flush immediately to record the initial EOF offset.
+  void flush();
+
   const poll = setInterval(() => {
-    if (!closed) flush();
+    if (!closed) void flush();
   }, 500);
 
   return () => {
