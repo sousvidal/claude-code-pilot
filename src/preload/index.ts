@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("sessions:getMessages", sessionId, dir),
     getSubagentMessages: (sessionId: string, toolUseId: string, dir?: string) =>
       ipcRenderer.invoke("sessions:getSubagentMessages", sessionId, toolUseId, dir),
+    delete: (sessionId: string, dir?: string) =>
+      ipcRenderer.invoke("sessions:delete", sessionId, dir),
   },
   claude: {
     start: (prompt: string, options: Record<string, unknown>) =>
@@ -17,6 +19,9 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("claude:cancel", sessionId ? { sessionId } : undefined),
     setModel: (model: string) => ipcRenderer.invoke("claude:setModel", model),
     models: () => ipcRenderer.invoke("claude:models"),
+    authStatus: () => ipcRenderer.invoke("claude:authStatus"),
+    usageStats: () => ipcRenderer.invoke("claude:usageStats"),
+    usageData: () => ipcRenderer.invoke("claude:usageData"),
     onMessage: (callback: (message: unknown) => void) => {
       const handler = (_event: IpcRendererEvent, message: unknown) =>
         callback(message);

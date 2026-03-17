@@ -10,6 +10,7 @@ import {
 } from "~/components/ui/resizable";
 import { Button } from "~/components/ui/button";
 import { ProjectTabBar } from "./ProjectTabBar";
+import { StatusBar } from "./StatusBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
 
@@ -51,6 +52,7 @@ export function AppLayout() {
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
         activeSessionId: state.activeSessionId,
+        pinnedSessionIds: state.pinnedSessionIds,
       });
     });
 
@@ -64,6 +66,7 @@ export function AppLayout() {
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
         activeSessionId: state.activeSessionId,
+        pinnedSessionIds: state.pinnedSessionIds ?? [],
       });
       useUIStore.setState({ sidebarCollapsed: state.sidebarCollapsed });
       initialized = true;
@@ -138,6 +141,8 @@ export function AppLayout() {
       ) : (
         <EmptyView />
       )}
+
+      <StatusBar />
     </div>
   );
 }
