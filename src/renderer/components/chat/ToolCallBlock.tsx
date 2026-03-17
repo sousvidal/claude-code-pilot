@@ -70,7 +70,7 @@ function getToolConfig(name: string) {
 function getSummary(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
     case "Read":
-      return typeof input.path === "string" ? input.path : "—";
+      return typeof input.file_path === "string" ? input.file_path : "—";
     case "Bash":
       return typeof input.command === "string"
         ? input.command
@@ -80,10 +80,10 @@ function getSummary(toolName: string, input: Record<string, unknown>): string {
         ? `"${input.search_term}"`
         : "—";
     case "Edit":
-      return typeof input.path === "string" ? input.path : "—";
+      return typeof input.file_path === "string" ? input.file_path : "—";
     case "Write":
-      return typeof input.path === "string"
-        ? `${input.path} (new)`
+      return typeof input.file_path === "string"
+        ? `${input.file_path} (new)`
         : "—";
     case "Glob":
       return typeof input.glob_pattern === "string"

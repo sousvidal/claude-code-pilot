@@ -43,6 +43,15 @@ function parseGrepResults(content: string): Array<{ file: string; lines: string[
   return [{ file: "output", lines: content.split("\n").filter(Boolean) }];
 }
 
+function stripReadContent(content: string): string {
+  return content
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .split("\n")
+    .map((line) => line.replace(/^\s*\d+\|/, ""))
+    .join("\n")
+    .trim();
+}
+
 function parseWebSearchResults(content: string): Array<{ title?: string; url?: string; snippet?: string }> {
   try {
     const parsed = JSON.parse(content);
@@ -76,20 +85,22 @@ export function ToolResultContent({ toolName, input, result }: ToolResultContent
   }
 
   const content = typeof result.content === "string" ? result.content : String(result.content ?? "");
-  const path = typeof input.path === "string" ? input.path : undefined;
+  const path = typeof input.file_path === "string" ? input.file_path : (typeof input.path === "string" ? input.path : undefined);
 
   switch (toolName) {
     case "Read":
-    case "Write":
+    case "Write": {
+      const displayContent = toolName === "Read" ? stripReadContent(content) : content;
       return (
         <div className="flex flex-col gap-2">
           {path && <FilePath path={path} />}
           <div className="relative group/code">
-            <CopyButton text={content} />
-            <CodeHighlight code={content} filePath={path} />
+            <CopyButton text={displayContent} />
+            <CodeHighlight code={displayContent} filePath={path} />
           </div>
         </div>
       );
+    }
 
     case "Bash": {
       const { stdout, stderr, text } = parseContent(content);
