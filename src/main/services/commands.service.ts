@@ -23,25 +23,9 @@ const BUILTIN_COMMANDS: SlashCommand[] = [
   { name: "vim", description: "Enter vim mode", source: "builtin" },
 ];
 
-function readCommandsFromDir(dir: string, source: SlashCommand["source"]): SlashCommand[] {
+async function extractDescription(filePath: string): Promise<string> {
   try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    return entries
-      .filter((e) => e.isFile() && e.name.endsWith(".md"))
-      .map((e) => {
-        const name = e.name.slice(0, -3);
-        const filePath = path.join(dir, e.name);
-        const description = extractDescription(filePath);
-        return { name, description, source };
-      });
-  } catch {
-    return [];
-  }
-}
-
-function extractDescription(filePath: string): string {
-  try {
-    const content = fs.readFileSync(filePath, "utf-8");
+    const content = await fs.promises.readFile(filePath, "utf-8");
     const firstLine = content.split("\n").find((line) => line.trim().length > 0) ?? "";
     return firstLine.replace(/^#+\s*/, "").trim();
   } catch {
@@ -49,14 +33,32 @@ function extractDescription(filePath: string): string {
   }
 }
 
-export const commandsService = {
-  list(projectPath?: string): SlashCommand[] {
-    const globalDir = path.join(os.homedir(), ".claude", "commands");
-    const userCommands = readCommandsFromDir(globalDir, "user");
+async function readCommandsFromDir(dir: string, source: SlashCommand["source"]): Promise<SlashCommand[]> {
+  try {
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    return Promise.all(
+      entries
+        .filter((e) => e.isFile() && e.name.endsWith(".md"))
+        .map(async (e) => {
+          const name = e.name.slice(0, -3);
+          const description = await extractDescription(path.join(dir, e.name));
+          return { name, description, source };
+        }),
+    );
+  } catch {
+    return [];
+  }
+}
 
-    const projectCommands = projectPath
-      ? readCommandsFromDir(path.join(projectPath, ".claude", "commands"), "project")
-      : [];
+export const commandsService = {
+  async list(projectPath?: string): Promise<SlashCommand[]> {
+    const globalDir = path.join(os.homedir(), ".claude", "commands");
+    const [userCommands, projectCommands] = await Promise.all([
+      readCommandsFromDir(globalDir, "user"),
+      projectPath
+        ? readCommandsFromDir(path.join(projectPath, ".claude", "commands"), "project")
+        : Promise.resolve([]),
+    ]);
 
     // Built-ins first, then user, then project — project overrides by name
     const byName = new Map<string, SlashCommand>();
