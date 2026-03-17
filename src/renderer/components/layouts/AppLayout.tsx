@@ -9,36 +9,9 @@ import {
   ResizableHandle,
 } from "~/components/ui/resizable";
 import { Button } from "~/components/ui/button";
-import { ActivityBar } from "./ActivityBar";
 import { ProjectTabBar } from "./ProjectTabBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
-
-function SettingsPanel() {
-  return (
-    <div className="flex h-full flex-col bg-card">
-      <div className="border-b border-border px-3 py-2">
-        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-          Settings
-        </span>
-      </div>
-      <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">Settings coming soon</p>
-      </div>
-    </div>
-  );
-}
-
-function SidebarContent() {
-  const activePanel = useUIStore((s) => s.activePanel);
-
-  switch (activePanel) {
-    case "sessions":
-      return <SessionBrowser />;
-    case "settings":
-      return <SettingsPanel />;
-  }
-}
 
 function EmptyView() {
   const openProject = useSessionsStore((s) => s.openProject);
@@ -66,7 +39,6 @@ function EmptyView() {
 
 export function AppLayout() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
-  const setActivePanel = useUIStore((s) => s.setActivePanel);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
 
@@ -79,12 +51,7 @@ export function AppLayout() {
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "b") {
           e.preventDefault();
-          const panel = useUIStore.getState().activePanel;
-          if (panel === "sessions") {
-            toggleSidebar();
-          } else {
-            setActivePanel("sessions");
-          }
+          toggleSidebar();
         }
         if (e.key === "k") {
           e.preventDefault();
@@ -92,7 +59,6 @@ export function AppLayout() {
             "[data-search-sessions]",
           );
           if (searchInput) {
-            setActivePanel("sessions");
             searchInput.focus();
           }
         }
@@ -108,7 +74,7 @@ export function AppLayout() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setActivePanel, toggleSidebar]);
+  }, [toggleSidebar]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
@@ -117,29 +83,25 @@ export function AppLayout() {
       </div>
 
       {activeProjectPath ? (
-        <div className="flex flex-1 overflow-hidden">
-          <ActivityBar />
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          {!sidebarCollapsed && (
+            <>
+              <ResizablePanel
+                defaultSize={22}
+                minSize={15}
+                maxSize={40}
+                order={1}
+              >
+                <SessionBrowser />
+              </ResizablePanel>
+              <ResizableHandle />
+            </>
+          )}
 
-          <ResizablePanelGroup direction="horizontal" className="flex-1">
-            {!sidebarCollapsed && (
-              <>
-                <ResizablePanel
-                  defaultSize={22}
-                  minSize={15}
-                  maxSize={40}
-                  order={1}
-                >
-                  <SidebarContent />
-                </ResizablePanel>
-                <ResizableHandle />
-              </>
-            )}
-
-            <ResizablePanel defaultSize={78} minSize={40} order={2}>
-              <ChatView />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
+          <ResizablePanel defaultSize={78} minSize={40} order={2}>
+            <ChatView />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       ) : (
         <EmptyView />
       )}
