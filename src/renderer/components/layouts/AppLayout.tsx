@@ -15,6 +15,8 @@ import { ProjectTabBar } from "./ProjectTabBar";
 import { StatusBar } from "./StatusBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
+import { TouchedFilesSidebar } from "~/components/chat/TouchedFilesSidebar";
+import { FileEditorPanel } from "~/components/chat/FileEditorPanel";
 
 function EmptyView() {
   const openProject = useSessionsStore((s) => s.openProject);
@@ -43,6 +45,8 @@ function EmptyView() {
 export function AppLayout() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
+  const openEditorFilePath = useUIStore((s) => s.openEditorFilePath);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
 
   useEffect(() => {
@@ -140,7 +144,19 @@ export function AppLayout() {
           )}
 
           <ResizablePanel defaultSize={78} minSize={40} order={2}>
-            <ChatView />
+            <div className="relative flex h-full">
+              <div className="relative min-w-0 flex-1">
+                <ChatView />
+                {openEditorFilePath && (
+                  <FileEditorPanel filePath={openEditorFilePath} />
+                )}
+              </div>
+              {!touchedFilesSidebarCollapsed && (
+                <div className="w-64 shrink-0">
+                  <TouchedFilesSidebar />
+                </div>
+              )}
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (

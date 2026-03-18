@@ -1,10 +1,13 @@
-import { ChevronRight, GitBranch } from "lucide-react";
+import { ChevronRight, GitBranch, PanelRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { useSessionsStore } from "~/stores/sessions";
+import { useUIStore } from "~/stores/ui";
 import { useSessionsService } from "~/services/sessions.service";
 import { useLiveSessionStore } from "~/stores/liveSession";
+import { useTouchedFiles } from "~/lib/use-touched-files";
 
 interface SessionInfo {
   sessionId: string;
@@ -19,6 +22,9 @@ export function ChatHeader() {
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
   const currentModel = useLiveSessionStore((s) => s.currentModel);
+  const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
+  const toggleTouchedFilesSidebar = useUIStore((s) => s.toggleTouchedFilesSidebar);
+  const touchedFiles = useTouchedFiles();
   const { listSessions } = useSessionsService();
 
   const { data: sessions } = useQuery({
@@ -57,6 +63,16 @@ export function ChatHeader() {
             <GitBranch className="h-3 w-3" />
             {activeSession.gitBranch}
           </Badge>
+        )}
+        {touchedFiles.length > 0 && touchedFilesSidebarCollapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={toggleTouchedFilesSidebar}
+          >
+            <PanelRight className="h-4 w-4" />
+          </Button>
         )}
       </div>
     </header>
