@@ -94,35 +94,53 @@ const OPERATION_STYLE: Record<
 // Tree nodes
 // ---------------------------------------------------------------------------
 
-function FileRow({ file }: { file: TouchedFile }) {
+interface FileRowProps {
+  file: TouchedFile;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+function FileRow({ file, isActive, onClick }: FileRowProps) {
   const style = OPERATION_STYLE[file.operation];
   const name = file.path.split("/").pop() ?? file.path;
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded px-2 py-0.5 text-sm hover:bg-muted/50">
+    <button
+      className={cn(
+        "flex w-full cursor-pointer items-center justify-between gap-2 rounded px-2 py-0.5 text-sm hover:bg-muted/50",
+        isActive && "bg-muted",
+      )}
+      onClick={onClick}
+    >
       <div className="flex min-w-0 items-center gap-1.5">
         <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className={cn("truncate", style.nameClass)}>{name}</span>
       </div>
       <span className={cn("shrink-0 text-xs font-medium", style.badgeClass)}>{style.label}</span>
-    </div>
+    </button>
   );
 }
 
-function TreeNodeRow({
-  name,
-  node,
-  depth,
-}: {
+interface TreeNodeRowProps {
   name: string;
   node: TreeNode;
   depth: number;
-}) {
+  activeFilePath: string | null;
+  onFileClick: (path: string) => void;
+}
+
+function TreeNodeRow({ name, node, depth, activeFilePath, onFileClick }: TreeNodeRowProps) {
   const [open, setOpen] = useState(true);
   const isLeafFile = node.file !== null && node.children.size === 0;
 
   if (isLeafFile) {
-    return <FileRow file={node.file!} />;
+    return (
+      <FileRow
+        file={node.file!}
+        isActive={activeFilePath === node.file!.path}
+        onClick={() => onFileClick(node.file!.path)}
+      />
+    );
   }
 
   const childEntries = Array.from(node.children.entries()).sort(
@@ -134,12 +152,18 @@ function TreeNodeRow({
     },
   );
 
-  // Root node: skip rendering a folder row, just render children directly.
   if (depth === 0) {
     return (
       <div>
         {childEntries.map(([childName, childNode]) => (
-          <TreeNodeRow key={childName} name={childName} node={childNode} depth={depth + 1} />
+          <TreeNodeRow
+            key={childName}
+            name={childName}
+            node={childNode}
+            depth={depth + 1}
+            activeFilePath={activeFilePath}
+            onFileClick={onFileClick}
+          />
         ))}
       </div>
     );
@@ -171,6 +195,8 @@ function TreeNodeRow({
               name={childName}
               node={childNode}
               depth={depth + 1}
+              activeFilePath={activeFilePath}
+              onFileClick={onFileClick}
             />
           ))}
         </div>
@@ -186,9 +212,10 @@ function TreeNodeRow({
 export function TouchedFilesSidebar() {
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
   const toggleTouchedFilesSidebar = useUIStore((s) => s.toggleTouchedFilesSidebar);
+  const openEditorFilePath = useUIStore((s) => s.openEditorFilePath);
+  const setOpenEditorFile = useUIStore((s) => s.setOpenEditorFile);
 
   const touchedFiles = useTouchedFiles();
-
   const tree = buildTree(touchedFiles, activeProjectPath);
 
   return (
@@ -207,7 +234,13 @@ export function TouchedFilesSidebar() {
         </Button>
       </div>
       <ScrollArea className="flex-1 px-1 py-2">
-        <TreeNodeRow name="" node={tree} depth={0} />
+        <TreeNodeRow
+          name=""
+          node={tree}
+          depth={0}
+          activeFilePath={openEditorFilePath}
+          onFileClick={setOpenEditorFile}
+        />
       </ScrollArea>
     </div>
   );

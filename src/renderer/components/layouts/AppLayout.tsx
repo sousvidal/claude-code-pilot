@@ -17,6 +17,7 @@ import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
 import { TouchedFilesSidebar } from "~/components/chat/TouchedFilesSidebar";
 import { useTouchedFiles } from "~/lib/use-touched-files";
+import { FileEditorPanel } from "~/components/chat/FileEditorPanel";
 
 function EmptyView() {
   const openProject = useSessionsStore((s) => s.openProject);
@@ -46,6 +47,7 @@ export function AppLayout() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
+  const openEditorFilePath = useUIStore((s) => s.openEditorFilePath);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
   const touchedFiles = useTouchedFiles();
 
@@ -154,7 +156,12 @@ export function AppLayout() {
           )}
 
           <ResizablePanel defaultSize={78} minSize={40} order={2}>
-            <ChatView key={activeProjectPath ?? ""} />
+            <div className="relative h-full">
+              <ChatView key={activeProjectPath ?? ""} />
+              {openEditorFilePath && (
+                <FileEditorPanel filePath={openEditorFilePath} />
+              )}
+            </div>
           </ResizablePanel>
 
           {touchedFiles.length > 0 && !touchedFilesSidebarCollapsed && (

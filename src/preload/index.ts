@@ -62,6 +62,10 @@ contextBridge.exposeInMainWorld("api", {
   commands: {
     list: (projectPath?: string) => ipcRenderer.invoke("commands:list", projectPath),
   },
+  git: {
+    getFileAtHead: (filePath: string) =>
+      ipcRenderer.invoke("git:getFileAtHead", filePath),
+  },
   permission: {
     onRequest: (callback: (request: PermissionRequest) => void) => {
       const handler = (_event: IpcRendererEvent, request: PermissionRequest) =>

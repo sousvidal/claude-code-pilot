@@ -65,6 +65,9 @@ interface Window {
     commands: {
       list: (projectPath?: string) => Promise<SlashCommand[]>;
     };
+    git: {
+      getFileAtHead: (filePath: string) => Promise<string | null>;
+    };
     permission: {
       onRequest: (callback: (request: PermissionRequest) => void) => () => void;
       onAutoApproved: (callback: (event: AutoApprovedEvent) => void) => () => void;

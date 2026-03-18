@@ -1,7 +1,6 @@
 import type { Turn, TouchedFile, FileOperation } from "../../shared/types";
 
 function extractPathFromBashCommand(command: string): { path: string; operation: "deleted" } | null {
-  // Match: rm [-rf] <path> — intentionally simple, no complex shell parsing
   const match = command.match(/\brm\s+(?:-[a-zA-Z]*\s+)*["']?([^\s"';&|]+)["']?/);
   if (match) {
     return { path: match[1], operation: "deleted" };
@@ -10,7 +9,6 @@ function extractPathFromBashCommand(command: string): { path: string; operation:
 }
 
 export function extractTouchedFiles(turns: Turn[]): TouchedFile[] {
-  // Map of path → last operation seen
   const seen = new Map<string, FileOperation>();
 
   for (const turn of turns) {
