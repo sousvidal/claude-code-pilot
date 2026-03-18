@@ -10,3 +10,6 @@
 /generated/prisma
 /prisma/*.db
 /prisma/*.db-journal
+
+# Plans
+/plans/
