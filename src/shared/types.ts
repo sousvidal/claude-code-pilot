@@ -87,3 +87,10 @@ export interface AutoApprovedEvent {
   sessionId: string;
   toolInput: Record<string, unknown>;
 }
+
+export type FileOperation = "created" | "modified" | "deleted";
+
+export interface TouchedFile {
+  path: string;
+  operation: FileOperation;
+}
