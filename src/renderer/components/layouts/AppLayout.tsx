@@ -15,6 +15,9 @@ import { ProjectTabBar } from "./ProjectTabBar";
 import { StatusBar } from "./StatusBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
+import { TouchedFilesSidebar } from "~/components/chat/TouchedFilesSidebar";
+import { TouchedFilesProvider, useTouchedFilesContext } from "~/lib/use-touched-files";
+import { FileEditorPanel } from "~/components/chat/FileEditorPanel";
 
 function EmptyView() {
   const openProject = useSessionsStore((s) => s.openProject);
@@ -43,7 +46,10 @@ function EmptyView() {
 export function AppLayout() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
+  const openEditorFilePath = useUIStore((s) => s.openEditorFilePath);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
+  const touchedFiles = useTouchedFilesContext();
 
   useEffect(() => {
     let mounted = true;
@@ -55,13 +61,18 @@ export function AppLayout() {
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
         activeSessionId: state.activeSessionId,
+        activeSessionsByProject: state.activeSessionsByProject,
         pinnedSessionIds: state.pinnedSessionIds,
+        scrollPositions: state.scrollPositions,
       });
     });
 
     const unsubUI = useUIStore.subscribe((state) => {
       if (!initialized) return;
-      void window.api.app.setState({ sidebarCollapsed: state.sidebarCollapsed });
+      void window.api.app.setState({
+        sidebarCollapsed: state.sidebarCollapsed,
+        touchedFilesSidebarCollapsed: state.touchedFilesSidebarCollapsed,
+      });
     });
 
     void window.api.app.getState().then((state) => {
@@ -70,9 +81,14 @@ export function AppLayout() {
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
         activeSessionId: state.activeSessionId,
+        activeSessionsByProject: state.activeSessionsByProject ?? {},
         pinnedSessionIds: state.pinnedSessionIds ?? [],
+        scrollPositions: state.scrollPositions ?? {},
       });
-      useUIStore.setState({ sidebarCollapsed: state.sidebarCollapsed });
+      useUIStore.setState({
+        sidebarCollapsed: state.sidebarCollapsed,
+        touchedFilesSidebarCollapsed: state.touchedFilesSidebarCollapsed,
+      });
       initialized = true;
     });
 
@@ -118,6 +134,7 @@ export function AppLayout() {
   }, [toggleSidebar]);
 
   return (
+    <TouchedFilesProvider>
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
       <div className="drag-region flex h-[38px] shrink-0 items-center border-b border-border bg-card/80 px-2 backdrop-blur-sm">
         <ProjectTabBar />
@@ -140,8 +157,22 @@ export function AppLayout() {
           )}
 
           <ResizablePanel defaultSize={78} minSize={40} order={2}>
-            <ChatView />
+            <div className="relative h-full">
+              <ChatView key={activeProjectPath ?? ""} />
+              {openEditorFilePath && (
+                <FileEditorPanel filePath={openEditorFilePath} />
+              )}
+            </div>
           </ResizablePanel>
+
+          {touchedFiles.length > 0 && !touchedFilesSidebarCollapsed && (
+            <>
+              <ResizableHandle />
+              <ResizablePanel defaultSize={20} minSize={14} maxSize={35} order={3}>
+                <TouchedFilesSidebar />
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       ) : (
         <EmptyView />
@@ -149,5 +180,6 @@ export function AppLayout() {
 
       <StatusBar />
     </div>
+    </TouchedFilesProvider>
   );
 }

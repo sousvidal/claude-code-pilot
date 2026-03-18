@@ -5,6 +5,7 @@ import { registerPermissionHandlers } from "./permissions";
 import { registerShellHandlers } from "./shell";
 import { registerAppStateHandlers } from "./appState";
 import { registerCommandHandlers } from "./commands";
+import { registerGitHandlers } from "./git";
 
 export function registerAllHandlers(): void {
   registerSessionHandlers();
@@ -14,4 +15,5 @@ export function registerAllHandlers(): void {
   registerShellHandlers();
   registerAppStateHandlers();
   registerCommandHandlers();
+  registerGitHandlers();
 }

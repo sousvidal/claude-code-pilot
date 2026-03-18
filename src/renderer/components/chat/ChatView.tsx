@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useLiveSessionStore } from "~/stores/liveSession";
@@ -37,6 +37,17 @@ export function ChatView() {
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
   const clearPendingNewSession = useSessionsStore((s) => s.clearPendingNewSession);
+  const scrollPositions = useSessionsStore((s) => s.scrollPositions);
+  const setScrollPosition = useSessionsStore((s) => s.setScrollPosition);
+
+  const initialScrollPosition = activeSessionId != null ? scrollPositions[activeSessionId] : undefined;
+
+  const handleScrollPositionChange = useCallback(
+    (position: number | null) => {
+      if (activeSessionId) setScrollPosition(activeSessionId, position);
+    },
+    [activeSessionId, setScrollPosition],
+  );
 
   const setRunSessionId = useLiveSessionStore((s) => s.setRunSessionId);
   const endRun = useLiveSessionStore((s) => s.endRun);
@@ -203,7 +214,13 @@ export function ChatView() {
           {isLoadingHistory && !isRunning && !hasLiveMessages ? (
             <MessageLoadingSkeleton />
           ) : (
-            <MessageStream messages={messages} isLive={isRunning} />
+            <MessageStream
+              key={activeSessionId ?? "new"}
+              messages={messages}
+              isLive={isRunning}
+              initialScrollPosition={initialScrollPosition}
+              onScrollPositionChange={handleScrollPositionChange}
+            />
           )}
         </ErrorBoundary>
       </div>

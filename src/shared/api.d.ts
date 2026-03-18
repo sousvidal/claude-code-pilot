@@ -4,8 +4,11 @@ interface PersistedAppState {
   openProjects: string[];
   activeProjectPath: string | null;
   activeSessionId: string | null;
+  activeSessionsByProject: Record<string, string | null>;
   sidebarCollapsed: boolean;
+  touchedFilesSidebarCollapsed: boolean;
   pinnedSessionIds: string[];
+  scrollPositions: Record<string, number | null>;
 }
 
 interface Window {
@@ -62,6 +65,9 @@ interface Window {
     };
     commands: {
       list: (projectPath?: string) => Promise<SlashCommand[]>;
+    };
+    git: {
+      getFileAtHead: (filePath: string) => Promise<string | null>;
     };
     permission: {
       onRequest: (callback: (request: PermissionRequest) => void) => () => void;

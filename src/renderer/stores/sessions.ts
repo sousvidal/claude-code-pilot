@@ -4,7 +4,8 @@ interface SessionsState {
   openProjects: string[];
   activeSessionId: string | null;
   activeProjectPath: string | null;
-  scrollPositions: Record<string, number>;
+  activeSessionsByProject: Record<string, string | null>;
+  scrollPositions: Record<string, number | null>;
   pendingNewSession: { projectPath: string; firstPrompt: string; sessionId?: string } | null;
   pinnedSessionIds: string[];
 
@@ -13,7 +14,7 @@ interface SessionsState {
   setActiveProjectPath: (path: string | null) => void;
   setActiveSession: (sessionId: string, projectPath: string) => void;
   clearActiveSession: () => void;
-  setScrollPosition: (sessionId: string, position: number) => void;
+  setScrollPosition: (sessionId: string, position: number | null) => void;
   setPendingNewSession: (data: { projectPath: string; firstPrompt: string; sessionId?: string }) => void;
   clearPendingNewSession: () => void;
   pinSession: (sessionId: string) => void;
@@ -24,25 +25,27 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
   openProjects: [],
   activeSessionId: null,
   activeProjectPath: null,
+  activeSessionsByProject: {},
   scrollPositions: {},
   pendingNewSession: null,
   pinnedSessionIds: [],
 
   openProject: (path) => {
-    const { openProjects } = get();
+    const { openProjects, activeSessionsByProject } = get();
+    const savedSession = activeSessionsByProject[path] ?? null;
     if (openProjects.includes(path)) {
-      set({ activeProjectPath: path, activeSessionId: null });
+      set({ activeProjectPath: path, activeSessionId: savedSession });
     } else {
       set({
         openProjects: [...openProjects, path],
         activeProjectPath: path,
-        activeSessionId: null,
+        activeSessionId: savedSession,
       });
     }
   },
 
   closeProject: (path) => {
-    const { openProjects, activeProjectPath } = get();
+    const { openProjects, activeProjectPath, activeSessionsByProject } = get();
     const filtered = openProjects.filter((p) => p !== path);
 
     if (activeProjectPath !== path) {
@@ -53,24 +56,40 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     const closedIndex = openProjects.indexOf(path);
     const nextProject =
       filtered[Math.min(closedIndex, filtered.length - 1)] ?? null;
+    const nextSession = nextProject != null ? (activeSessionsByProject[nextProject] ?? null) : null;
 
     set({
       openProjects: filtered,
       activeProjectPath: nextProject,
-      activeSessionId: null,
+      activeSessionId: nextSession,
     });
   },
 
   setActiveProjectPath: (path) => {
-    set({ activeProjectPath: path, activeSessionId: null });
+    const { activeSessionsByProject } = get();
+    const savedSession = path != null ? (activeSessionsByProject[path] ?? null) : null;
+    set({ activeProjectPath: path, activeSessionId: savedSession });
   },
 
   setActiveSession: (sessionId, projectPath) => {
-    set({ activeSessionId: sessionId, activeProjectPath: projectPath });
+    set((state) => ({
+      activeSessionId: sessionId,
+      activeProjectPath: projectPath,
+      activeSessionsByProject: {
+        ...state.activeSessionsByProject,
+        [projectPath]: sessionId,
+      },
+    }));
   },
 
   clearActiveSession: () => {
-    set({ activeSessionId: null });
+    set((state) => {
+      const updatedMap = { ...state.activeSessionsByProject };
+      if (state.activeProjectPath != null) {
+        updatedMap[state.activeProjectPath] = null;
+      }
+      return { activeSessionId: null, activeSessionsByProject: updatedMap };
+    });
   },
 
   setScrollPosition: (sessionId, position) =>
