@@ -5,7 +5,7 @@ interface SessionsState {
   activeSessionId: string | null;
   activeProjectPath: string | null;
   activeSessionsByProject: Record<string, string | null>;
-  scrollPositions: Record<string, number>;
+  scrollPositions: Record<string, number | null>;
   pendingNewSession: { projectPath: string; firstPrompt: string; sessionId?: string } | null;
   pinnedSessionIds: string[];
 
@@ -14,7 +14,7 @@ interface SessionsState {
   setActiveProjectPath: (path: string | null) => void;
   setActiveSession: (sessionId: string, projectPath: string) => void;
   clearActiveSession: () => void;
-  setScrollPosition: (sessionId: string, position: number) => void;
+  setScrollPosition: (sessionId: string, position: number | null) => void;
   setPendingNewSession: (data: { projectPath: string; firstPrompt: string; sessionId?: string }) => void;
   clearPendingNewSession: () => void;
   pinSession: (sessionId: string) => void;

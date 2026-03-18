@@ -6,8 +6,9 @@ interface PersistedAppState {
   activeSessionId: string | null;
   activeSessionsByProject: Record<string, string | null>;
   sidebarCollapsed: boolean;
+  touchedFilesSidebarCollapsed: boolean;
   pinnedSessionIds: string[];
-  scrollPositions: Record<string, number>;
+  scrollPositions: Record<string, number | null>;
 }
 
 interface Window {

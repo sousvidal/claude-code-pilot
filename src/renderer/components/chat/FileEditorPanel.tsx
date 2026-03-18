@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import Editor, { DiffEditor, type BeforeMount } from "@monaco-editor/react";
+import { useEffect, useRef, useState } from "react";
+import Editor, { DiffEditor, type BeforeMount, type OnMount as OnDiffMount } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
@@ -85,6 +86,10 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
   const [isDiffMode, setIsDiffMode] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [editorValue, setEditorValue] = useState<string>("");
+  const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
+  // Captures editorValue at the moment diff mode is entered — passed as the
+  // stable `modified` prop so Monaco never receives a controlled re-render.
+  const diffInitialValueRef = useRef<string>("");
 
   const fileName = filePath.split("/").pop() ?? filePath;
   const language = detectLanguage(filePath);
@@ -111,6 +116,7 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
   useEffect(() => {
     setIsDiffMode(false);
     setIsPreviewMode(false);
+    diffEditorRef.current = null;
   }, [filePath]);
 
   const handleClose = () => {
@@ -119,7 +125,13 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
 
   const handleSave = async () => {
     try {
-      await window.api.files.writeFile(filePath, editorValue);
+      const content = diffEditorRef.current
+        ? diffEditorRef.current.getModifiedEditor().getValue()
+        : editorValue;
+      await window.api.files.writeFile(filePath, content);
+      if (diffEditorRef.current) {
+        setEditorValue(content);
+      }
       toast.success("File saved");
     } catch {
       toast.error("Failed to save file");
@@ -191,7 +203,10 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
                 variant={isDiffMode ? "secondary" : "ghost"}
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => setIsDiffMode((d) => !d)}
+                onClick={() => {
+                  if (!isDiffMode) diffInitialValueRef.current = editorValue;
+                  setIsDiffMode((d) => !d);
+                }}
               >
                 {isDiffMode ? "Editor" : "Diff"}
               </Button>
@@ -252,7 +267,7 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
               language={language}
               theme="vs-dark"
               original={headContent ?? ""}
-              modified={editorValue}
+              modified={diffInitialValueRef.current}
               beforeMount={handleBeforeMount}
               options={{
                 renderSideBySide: false,
@@ -261,13 +276,9 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
                 scrollBeyondLastLine: false,
                 fontSize: 13,
               }}
-              onMount={(_editor) => {
-                // Keep editorValue in sync when the modified model changes
-                const modifiedEditor = _editor.getModifiedEditor();
-                modifiedEditor.onDidChangeModelContent(() => {
-                  setEditorValue(modifiedEditor.getValue());
-                });
-              }}
+              onMount={((_editor: editor.IStandaloneDiffEditor) => {
+                diffEditorRef.current = _editor;
+              }) satisfies Parameters<OnDiffMount>[0]}
             />
           ) : (
             <Editor

@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useLiveSessionStore } from "~/stores/liveSession";
@@ -7,6 +8,21 @@ import { useSessionsService } from "~/services/sessions.service";
 import { parseTurns } from "~/lib/parse-turns";
 import { extractTouchedFiles } from "~/lib/extract-touched-files";
 import type { TouchedFile } from "../../shared/types";
+
+const TouchedFilesContext = createContext<TouchedFile[]>([]);
+
+export function TouchedFilesProvider({ children }: { children: ReactNode }) {
+  const touchedFiles = useTouchedFiles();
+  return (
+    <TouchedFilesContext.Provider value={touchedFiles}>
+      {children}
+    </TouchedFilesContext.Provider>
+  );
+}
+
+export function useTouchedFilesContext(): TouchedFile[] {
+  return useContext(TouchedFilesContext);
+}
 
 export function useTouchedFiles(): TouchedFile[] {
   const activeSessionId = useSessionsStore((s) => s.activeSessionId);

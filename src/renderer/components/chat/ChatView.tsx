@@ -43,7 +43,7 @@ export function ChatView() {
   const initialScrollPosition = activeSessionId != null ? scrollPositions[activeSessionId] : undefined;
 
   const handleScrollPositionChange = useCallback(
-    (position: number) => {
+    (position: number | null) => {
       if (activeSessionId) setScrollPosition(activeSessionId, position);
     },
     [activeSessionId, setScrollPosition],

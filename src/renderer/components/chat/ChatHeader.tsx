@@ -7,7 +7,7 @@ import { useSessionsStore } from "~/stores/sessions";
 import { useUIStore } from "~/stores/ui";
 import { useSessionsService } from "~/services/sessions.service";
 import { useLiveSessionStore } from "~/stores/liveSession";
-import { useTouchedFiles } from "~/lib/use-touched-files";
+import { useTouchedFilesContext } from "~/lib/use-touched-files";
 
 interface SessionInfo {
   sessionId: string;
@@ -24,7 +24,7 @@ export function ChatHeader() {
   const currentModel = useLiveSessionStore((s) => s.currentModel);
   const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
   const toggleTouchedFilesSidebar = useUIStore((s) => s.toggleTouchedFilesSidebar);
-  const touchedFiles = useTouchedFiles();
+  const touchedFiles = useTouchedFilesContext();
   const { listSessions } = useSessionsService();
 
   const { data: sessions } = useQuery({

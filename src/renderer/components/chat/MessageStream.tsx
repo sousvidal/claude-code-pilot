@@ -10,8 +10,8 @@ import { TurnBlock } from "./TurnBlock";
 interface MessageStreamProps {
   messages: unknown[];
   isLive?: boolean;
-  initialScrollPosition?: number;
-  onScrollPositionChange?: (position: number) => void;
+  initialScrollPosition?: number | null;
+  onScrollPositionChange?: (position: number | null) => void;
 }
 
 export function MessageStream({
@@ -83,7 +83,7 @@ export function MessageStream({
       // Save 0 as a sentinel for "was at bottom" so that on restore the
       // virtualizer-based stick-to-bottom path is used instead of raw scrollTop,
       // which would land at the wrong position before items are measured.
-      onScrollPositionChange?.(isNearBottom() ? 0 : el.scrollTop);
+      onScrollPositionChange?.(isNearBottom() ? null : el.scrollTop);
     }, 300);
   }, [isNearBottom, onScrollPositionChange]);
 
@@ -95,7 +95,7 @@ export function MessageStream({
     if (!el) return;
 
     hasRestoredRef.current = true;
-    if (initialScrollPosition != null && initialScrollPosition > 0) {
+    if (initialScrollPosition != null) {
       el.scrollTop = initialScrollPosition;
       wasNearBottomRef.current = isNearBottom();
       setShowScrollToBottom(!wasNearBottomRef.current);

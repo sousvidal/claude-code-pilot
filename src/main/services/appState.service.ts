@@ -9,7 +9,7 @@ export interface PersistedAppState {
   sidebarCollapsed: boolean;
   touchedFilesSidebarCollapsed: boolean;
   pinnedSessionIds: string[];
-  scrollPositions: Record<string, number>;
+  scrollPositions: Record<string, number | null>;
 }
 
 // electron-store ships as ESM; when bundled to CJS the constructor is on .default
@@ -121,7 +121,11 @@ export function setAppState(partial: Partial<PersistedAppState>): void {
   }
   if ("scrollPositions" in partial) {
     if (partial.scrollPositions && typeof partial.scrollPositions === "object") {
-      validated.scrollPositions = partial.scrollPositions;
+      const entries = Object.entries(partial.scrollPositions);
+      validated.scrollPositions =
+        entries.length > 200
+          ? Object.fromEntries(entries.slice(-200))
+          : partial.scrollPositions;
     }
   }
 

@@ -16,7 +16,7 @@ import { StatusBar } from "./StatusBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
 import { TouchedFilesSidebar } from "~/components/chat/TouchedFilesSidebar";
-import { useTouchedFiles } from "~/lib/use-touched-files";
+import { TouchedFilesProvider, useTouchedFilesContext } from "~/lib/use-touched-files";
 import { FileEditorPanel } from "~/components/chat/FileEditorPanel";
 
 function EmptyView() {
@@ -49,7 +49,7 @@ export function AppLayout() {
   const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
   const openEditorFilePath = useUIStore((s) => s.openEditorFilePath);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
-  const touchedFiles = useTouchedFiles();
+  const touchedFiles = useTouchedFilesContext();
 
   useEffect(() => {
     let mounted = true;
@@ -134,6 +134,7 @@ export function AppLayout() {
   }, [toggleSidebar]);
 
   return (
+    <TouchedFilesProvider>
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
       <div className="drag-region flex h-[38px] shrink-0 items-center border-b border-border bg-card/80 px-2 backdrop-blur-sm">
         <ProjectTabBar />
@@ -179,5 +180,6 @@ export function AppLayout() {
 
       <StatusBar />
     </div>
+    </TouchedFilesProvider>
   );
 }

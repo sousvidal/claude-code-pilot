@@ -128,6 +128,8 @@ export function SessionBrowser() {
         ? (el) => el.getBoundingClientRect().height
         : undefined,
     overscan: 8,
+    paddingStart: 4,
+    paddingEnd: 12,
   });
 
   return (
@@ -177,7 +179,7 @@ export function SessionBrowser() {
           <div ref={parentRef} className="h-full overflow-y-auto">
             <div
               style={{ height: `${virtualizer.getTotalSize()}px` }}
-              className="relative px-2 pt-1 pb-3"
+              className="relative"
             >
               {virtualizer.getVirtualItems().map((vItem) => {
                 const item = flatItems[vItem.index];

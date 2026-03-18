@@ -10,7 +10,7 @@ import {
 
 import { useSessionsStore } from "~/stores/sessions";
 import { useUIStore } from "~/stores/ui";
-import { useTouchedFiles } from "~/lib/use-touched-files";
+import { useTouchedFilesContext } from "~/lib/use-touched-files";
 import { cn } from "~/lib/utils";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Button } from "~/components/ui/button";
@@ -215,7 +215,7 @@ export function TouchedFilesSidebar() {
   const openEditorFilePath = useUIStore((s) => s.openEditorFilePath);
   const setOpenEditorFile = useUIStore((s) => s.setOpenEditorFile);
 
-  const touchedFiles = useTouchedFiles();
+  const touchedFiles = useTouchedFilesContext();
   const tree = buildTree(touchedFiles, activeProjectPath);
 
   return (
