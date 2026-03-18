@@ -15,6 +15,8 @@ import { ProjectTabBar } from "./ProjectTabBar";
 import { StatusBar } from "./StatusBar";
 import { SessionBrowser } from "~/components/sessions/SessionBrowser";
 import { ChatView } from "~/components/chat/ChatView";
+import { TouchedFilesSidebar } from "~/components/chat/TouchedFilesSidebar";
+import { useTouchedFiles } from "~/lib/use-touched-files";
 
 function EmptyView() {
   const openProject = useSessionsStore((s) => s.openProject);
@@ -43,7 +45,9 @@ function EmptyView() {
 export function AppLayout() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const touchedFilesSidebarCollapsed = useUIStore((s) => s.touchedFilesSidebarCollapsed);
   const activeProjectPath = useSessionsStore((s) => s.activeProjectPath);
+  const touchedFiles = useTouchedFiles();
 
   useEffect(() => {
     let mounted = true;
@@ -55,13 +59,18 @@ export function AppLayout() {
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
         activeSessionId: state.activeSessionId,
+        activeSessionsByProject: state.activeSessionsByProject,
         pinnedSessionIds: state.pinnedSessionIds,
+        scrollPositions: state.scrollPositions,
       });
     });
 
     const unsubUI = useUIStore.subscribe((state) => {
       if (!initialized) return;
-      void window.api.app.setState({ sidebarCollapsed: state.sidebarCollapsed });
+      void window.api.app.setState({
+        sidebarCollapsed: state.sidebarCollapsed,
+        touchedFilesSidebarCollapsed: state.touchedFilesSidebarCollapsed,
+      });
     });
 
     void window.api.app.getState().then((state) => {
@@ -70,9 +79,14 @@ export function AppLayout() {
         openProjects: state.openProjects,
         activeProjectPath: state.activeProjectPath,
         activeSessionId: state.activeSessionId,
+        activeSessionsByProject: state.activeSessionsByProject ?? {},
         pinnedSessionIds: state.pinnedSessionIds ?? [],
+        scrollPositions: state.scrollPositions ?? {},
       });
-      useUIStore.setState({ sidebarCollapsed: state.sidebarCollapsed });
+      useUIStore.setState({
+        sidebarCollapsed: state.sidebarCollapsed,
+        touchedFilesSidebarCollapsed: state.touchedFilesSidebarCollapsed,
+      });
       initialized = true;
     });
 
@@ -140,8 +154,17 @@ export function AppLayout() {
           )}
 
           <ResizablePanel defaultSize={78} minSize={40} order={2}>
-            <ChatView />
+            <ChatView key={activeProjectPath ?? ""} />
           </ResizablePanel>
+
+          {touchedFiles.length > 0 && !touchedFilesSidebarCollapsed && (
+            <>
+              <ResizableHandle />
+              <ResizablePanel defaultSize={20} minSize={14} maxSize={35} order={3}>
+                <TouchedFilesSidebar />
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       ) : (
         <EmptyView />

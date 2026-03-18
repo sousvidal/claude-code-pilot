@@ -4,8 +4,10 @@ interface PersistedAppState {
   openProjects: string[];
   activeProjectPath: string | null;
   activeSessionId: string | null;
+  activeSessionsByProject: Record<string, string | null>;
   sidebarCollapsed: boolean;
   pinnedSessionIds: string[];
+  scrollPositions: Record<string, number>;
 }
 
 interface Window {
