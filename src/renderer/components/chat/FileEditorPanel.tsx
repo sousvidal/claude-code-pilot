@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import Editor, { DiffEditor } from "@monaco-editor/react";
+import Editor, { DiffEditor, type BeforeMount } from "@monaco-editor/react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 
 import { useUIStore } from "~/stores/ui";
 import { Button } from "~/components/ui/button";
@@ -80,10 +83,12 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
   const setOpenEditorFile = useUIStore((s) => s.setOpenEditorFile);
 
   const [isDiffMode, setIsDiffMode] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [editorValue, setEditorValue] = useState<string>("");
 
   const fileName = filePath.split("/").pop() ?? filePath;
   const language = detectLanguage(filePath);
+  const isMarkdown = language === "markdown";
 
   const { data: fileContent, isLoading: isLoadingFile } = useQuery({
     queryKey: ["file", filePath],
@@ -102,9 +107,10 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
     }
   }, [fileContent]);
 
-  // Reset diff mode when file changes
+  // Reset modes when file changes
   useEffect(() => {
     setIsDiffMode(false);
+    setIsPreviewMode(false);
   }, [filePath]);
 
   const handleClose = () => {
@@ -138,6 +144,17 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
 
   const canDiff = headContent !== null && headContent !== undefined;
 
+  const handleBeforeMount: BeforeMount = (monaco) => {
+    const noDiagnostics = {
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+      noSuggestionDiagnostics: true,
+    };
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(noDiagnostics);
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(noDiagnostics);
+    monaco.languages.json.jsonDefaults.setDiagnosticsOptions({ validate: false });
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -150,7 +167,7 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
       {/* Panel */}
       <div
         className={cn(
-          "absolute bottom-0 right-0 top-0 z-20 flex w-3/5 flex-col border-l border-border bg-background shadow-2xl",
+          "absolute bottom-0 right-0 top-0 z-20 flex w-4/5 flex-col border-l border-border bg-background shadow-2xl",
           "transition-transform duration-200",
         )}
       >
@@ -159,7 +176,17 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
           <span className="truncate text-sm font-medium text-foreground">{fileName}</span>
 
           <div className="flex shrink-0 items-center gap-1">
-            {canDiff && (
+            {isMarkdown && (
+              <Button
+                variant={isPreviewMode ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setIsPreviewMode((p) => !p)}
+              >
+                {isPreviewMode ? "Edit" : "Preview"}
+              </Button>
+            )}
+            {canDiff && !isPreviewMode && (
               <Button
                 variant={isDiffMode ? "secondary" : "ghost"}
                 size="sm"
@@ -194,6 +221,31 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Loading…
             </div>
+          ) : isPreviewMode ? (
+            <div className="h-full overflow-y-auto px-8 py-6">
+              <div className="max-w-none text-sm text-foreground leading-7
+                [&_p]:mb-4 [&_p:last-child]:mb-0
+                [&_ul]:my-3 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1
+                [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1
+                [&_li]:leading-7
+                [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:first:mt-0
+                [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-7 [&_h2]:mb-3
+                [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
+                [&_h4]:text-sm [&_h4]:font-semibold [&_h4]:mt-4 [&_h4]:mb-1
+                [&_pre]:my-4 [&_pre]:bg-muted [&_pre]:rounded-md [&_pre]:p-4 [&_pre]:overflow-x-auto [&_pre]:text-[13px]
+                [&_code]:bg-muted [&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px]
+                [&_pre_code]:bg-transparent [&_pre_code]:p-0
+                [&_blockquote]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:py-0.5 [&_blockquote]:text-muted-foreground
+                [&_hr]:my-6 [&_hr]:border-border
+                [&_table]:my-4 [&_table]:w-full [&_table]:text-sm
+                [&_th]:text-left [&_th]:font-semibold [&_th]:border-b [&_th]:border-border [&_th]:pb-2 [&_th]:pr-4
+                [&_td]:py-2 [&_td]:pr-4 [&_td]:border-b [&_td]:border-border/40
+                [&_a]:text-accent-blue [&_a]:underline [&_a]:underline-offset-2">
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                  {editorValue}
+                </ReactMarkdown>
+              </div>
+            </div>
           ) : isDiffMode && canDiff ? (
             <DiffEditor
               height="100%"
@@ -201,6 +253,7 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
               theme="vs-dark"
               original={headContent ?? ""}
               modified={editorValue}
+              beforeMount={handleBeforeMount}
               options={{
                 renderSideBySide: false,
                 readOnly: false,
@@ -223,6 +276,7 @@ export function FileEditorPanel({ filePath }: FileEditorPanelProps) {
               theme="vs-dark"
               value={editorValue}
               onChange={(value) => setEditorValue(value ?? "")}
+              beforeMount={handleBeforeMount}
               options={{
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
